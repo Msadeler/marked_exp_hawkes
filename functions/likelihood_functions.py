@@ -1,0 +1,755 @@
+# Imports
+import numpy as np
+from scipy.optimize import minimize
+
+
+def likelihood_Poisson(theta, tList):
+     
+    """
+    Exact computation of the loglikelihood for an Poisson Process. 
+    Estimation for a single realization.
+    
+    Parameters
+    ----------
+    theta : tuple of float
+        Tuple containing the parameters to use for estimation.
+    tList : list of float
+        List containing all the lists of data (event times).
+
+    Returns
+    -------
+    likelihood : float
+        Value of likelihood, either for 1 realization or for a batch. 
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+
+    """
+    
+
+    loglik = (len(tList)-2)*np.log(theta[0]) - tList[-1]*theta[0]
+
+    return(-loglik)
+
+
+def likelihood_with_refractory_period(theta,delay,tList):
+    
+    """
+    Exact computation of the loglikelihood for an exponential Hawkes process for either self-exciting or self-regulating cases. 
+    Estimation for a single realization.
+    
+    Parameters
+    ----------
+    theta : tuple of float
+        Tuple containing the parameters to use for estimation.
+    tList : list of float
+        List containing all the lists of data (event times).
+
+    Returns
+    -------
+    likelihood : float
+        Value of likelihood, either for 1 realization or for a batch. 
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+    """
+    # Extract variables
+    lambda0, a, b = theta
+    
+
+    # Avoid wrong values in algorithm such as negative lambda0 or b
+    if lambda0 <= 0 or b <= 0:
+        return 1e5
+
+    else:
+
+        compensator_k = lambda0 * tList[1] ##  int_(Tk,Tk+1) lambda(t)dt
+        lambda_avant = lambda0 ##  lambda(Tk)
+        lambda_k = lambda0 + a ##  lambda((Tk+delay)^+)
+
+        if lambda_avant <= 0:
+            return 1e5
+
+        likelihood = np.log(lambda_avant) - compensator_k
+        old_time = tList[1]
+        
+        # Iteration
+        for time in tList[2:-1]:
+            
+            tau_star = time - old_time - delay - b**(-1)*np.log( (lambda0- lambda_k*(lambda_k<=0))/lambda0)
+            C_k = lambda_k*(lambda_k>=0)- lambda0
+
+
+            lambda_avant = (lambda0 + (lambda_k - lambda0) * np.exp(-b * (time - old_time-delay)))*(time-old_time>delay)
+            lambda_k = lambda_avant + a
+            compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+            
+
+     
+            old_time = time
+            
+            if lambda_avant <= 0:
+                return 1e5           
+
+
+            likelihood += np.log(lambda_avant) - compensator_k
+        
+        time =tList[-1]
+        old_time = tList[-2]
+        
+        tau_star = time - old_time - delay - b**(-1)*np.log( (lambda0- lambda_k*(lambda_k<=0))/lambda0)
+        C_k = lambda_k*(lambda_k>=0)- lambda0
+
+        compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+        
+
+
+        likelihood -=  compensator_k
+        
+        
+
+    return(-likelihood)
+    
+    
+
+# Functions for exponential estimation of loglikelihood.
+
+def likelihood_daichan(a, mu, b, tList):
+
+
+    compensator_k = mu * tList[1]
+    lambda_avant = mu
+    lambda_k = mu + a
+
+    if lambda_avant <= 0:
+        return 1e5
+
+    likelihood = np.log(lambda_avant) - compensator_k
+
+    # Iteration
+    for k in range(2, len(tList)-1):
+
+        if lambda_k >= 0:
+            C_k = lambda_k - mu
+            tau_star = tList[k] - tList[k - 1]
+        else:
+            C_k = -mu
+            tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - mu)) - np.log(mu)) / b
+
+        lambda_avant = mu + (lambda_k - mu) * np.exp(-b * (tList[k] - tList[k - 1]))
+        lambda_k = lambda_avant + a
+        compensator_k = mu * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+
+        if lambda_avant <= 0:
+            return 1e5
+        
+        
+
+        likelihood += np.log(lambda_avant) - compensator_k
+    
+    k = len(tList)-1
+    
+    if lambda_k >= 0:
+        C_k = lambda_k - mu
+        tau_star = tList[k] - tList[k - 1]
+    else:
+        C_k = -mu
+        tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - mu)) - np.log(mu)) / b
+
+    compensator_k = mu * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+
+    likelihood -=  compensator_k
+    # We return the opposite of the likelihood in order to use minimization packages.
+    
+    return -likelihood
+
+
+
+def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_f={}):
+    
+    """
+    Exact computation of the loglikelihood for an exponential marked Hawkes process. 
+    Estimation for a single realization.
+    
+    Parameters
+    ----------
+    theta : tuple of float
+        Tuple containing the parameters to use for estimation.
+        
+    tList : list of float
+        List containing all the lists of data (event times).
+        
+    markeList: list of float 
+        List containing the value of the mark at the time of each jump int tList
+        
+    f: density function
+        The density of the mark , the density must have at list two paramaters: the mark value (first argment) and the time value (second one)
+        
+    phi: function 
+        The function describing the impact of the mark on the interaction between each neuron
+    
+    arg_phi: parameters for the function phi
+        dictionnary of parameters allowing to compute the function phi,  this dictionnary does not containg the argument mark 
+    
+    arg_f: parameters for the density f
+        dictionnary of parameters allowing to compute the density, this dictionnary does not containg the argument mark or time
+
+
+    Returns
+    -------
+    likelihood : float
+        Value of likelihood 
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+    """
+   
+    # unpack hawkes parameters 
+    lambda0, a, b  = theta
+
+    if lambda0 <= 0 or b <= 0:
+        return 1e5
+    
+    else: 
+        compensator_k = lambda0 * tList[1]
+        lambda_avant = lambda0
+        lambda_k = lambda0 + a*phi(markeList[1],**arg_phi, **arg_f)
+    
+    likelihood = np.log(lambda_avant) - compensator_k
+    
+    
+    for k in range(2, len(tList)-1):
+        
+        if lambda_k >= 0:
+            C_k = lambda_k - lambda0
+            tau_star = tList[k] - tList[k - 1]
+        else:
+            C_k = -lambda0
+            tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+
+        lambda_avant = lambda0 + (lambda_k - lambda0) * np.exp(-b * (tList[k] - tList[k - 1]))
+        lambda_k = lambda_avant + a*phi(markeList[k],**arg_phi, **arg_f)
+        compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+
+        if lambda_avant <= 0:
+             return 1e5
+         
+        likelihood += np.log(lambda_avant) - compensator_k
+    
+
+    if lambda_k >= 0:
+        C_k = lambda_k - lambda0
+        tau_star = tList[k] - tList[k - 1]
+    else:
+        C_k = -lambda0
+        tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+
+    compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+
+    if lambda_avant <= 0:
+        return 1e5
+
+    likelihood -= compensator_k
+
+    
+    
+        
+    likelihood_mark = list(map(lambda x,y: np.log(f(x, y, **arg_f)), markeList[1:-1], tList[1:-1]))
+    
+    likelihood+=sum(likelihood_mark)
+    
+     # We return the opposite of the likelihood in order to use minimization packages.
+    return -likelihood
+
+    
+def function_to_optimize(x:list, tList:list, markeList:list, name_arg_f, name_arg_phi, f, phi):
+    
+    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
+    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+    theta = x[len(name_arg_f)+len(name_arg_phi):]         
+
+    return(loglikelihoodMarkedHawkes(theta, tList, markeList, f, phi, arg_phi, arg_f))
+
+
+
+def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, options):
+     return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
+
+
+def minimization_unidim_unmark(list_times, loss, initial_guess, bounds, options):
+     return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
+
+def minimization_unidim_marked(x,y,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
+    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x, y, name_arg_f,name_arg_phi,f,phi)))
+
+
+def multivariate_marked_likelihood( theta, tList, phi = lambda x : 1, f = lambda x : 1, arg_phi ={} ,arg_f={}, dim=None, dimensional=False):
+    """
+
+    Parameters
+    ----------
+    theta : tuple of array
+        Tuple containing 3 arrays. First corresponds to vector of baseline intensities mu. Second is a square matrix
+        corresponding to interaction matrix a. Last is vector of recovery rates b.
+
+    tList : list of tuple
+        List containing tuples (t, d, m) where t is the time of event and d the processu that jumped at time t 
+        and m the mark associated to the jump
+        Important to note that this algorithm expects the first and last time to mark the beginning and
+        the horizon of the observed process. As such, first and last marks must be equal to 0, signifying that they are
+        not real event times.
+        The algorithm checks by itself if this condition is respected, otherwise it sets the beginning at 0 and the end
+        equal to the last time event.
+    dim : int
+        Number of processes only necessary if providing 1-dimensional theta. Default is None
+    dimensional : bool
+        Whether to return the sum of loglikelihood or decomposed in each dimension. Default is False.
+        
+Returns
+    -------
+    likelihood : array of float
+        Value of likelihood at each process.
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+    """
+    if isinstance(theta, np.ndarray):
+        if dim is None:
+            raise ValueError("Must provide dimension to unpack correctly")
+        else:
+            mu = np.array(theta[:dim]).reshape((dim, 1))
+            a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
+            b = np.array(theta[dim * (dim + 1):]).reshape((dim, 1))
+    else:
+        mu, a, b = (i.copy() for i in theta)
+    b = b + 1e-10
+    b_1 = 1/b
+
+    timestamps = tList.copy()
+
+    # We first check if we have the correct beginning and ending.
+    if timestamps[0][1] > 0:
+        timestamps = [(0, 0)] + timestamps
+    if timestamps[-1][1] > 0:
+        timestamps += [(timestamps[-1][0], 0)]
+
+    # Initialise values
+    time_b, dim_b, mark_b  = timestamps[1]
+    
+    # Compensator between beginning and first event time
+    compensator = mu*(time_b - timestamps[0][0])
+    
+    
+    # Intensity before first jump
+    log_i = np.zeros((a.shape[0],1))
+    log_i[dim_b-1] = np.log(mu[dim_b-1])
+    
+    
+    ic = mu + np.multiply(a[:, [dim_b - 1]], phi(mark_b, **arg_phi, **arg_f))
+    
+    # j=1
+    
+    for time_c, dim_c, mark_c in timestamps[2:]:
+        
+        # First we estimate the compensator
+        inside_log = (mu - np.minimum(ic, 0))/mu
+        
+        # Restart time
+        t_star = time_b + np.multiply(b_1, np.log(inside_log))
+
+        aux = 1/inside_log  # inside_log can't be equal to zero (coordinate-wise)
+        
+        #aux = np.minimum(1, aux)
+        
+        compensator += (t_star < time_c)*(np.multiply(mu, time_c-t_star) + np.multiply(b_1, ic-mu)*(aux - np.exp(-b*(time_c-time_b))))
+
+        # Then, estimation of intensity before next jump.
+        if dim_c > 0:
+            ic = mu + np.multiply((ic - mu), np.exp(-b*(time_c-time_b))) 
+
+            if ic[dim_c - 1] <= 0.0:
+
+                res = 1e8
+                return res
+            else:
+                log_i[dim_c-1] += np.log(ic[dim_c - 1])
+
+            ic += np.multiply(a[:, [dim_c - 1]], phi(mark_c , **arg_phi,**arg_f))
+
+        time_b = time_c
+    likelihood = log_i - compensator
+
+    likelihood += np.sum(list(map(lambda y : np.log(f(y[2], y[0], **arg_f)), tList)))
+
+    
+    if not(dimensional):
+        
+        likelihood = np.sum(likelihood)  
+        
+    return -likelihood
+        
+
+
+def opimisation_marked_hawkes(x:list, tList: list, name_arg_phi: list, name_arg_f,phi ,f, nb_arg_phi, dim:int):
+    
+    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
+    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+    theta = x[len(name_arg_f)+len(name_arg_phi):]         
+    
+    return(multivariate_marked_likelihood(theta, tList, phi, f, arg_phi, arg_f, dim=dim))
+
+    
+      
+    
+def loglikelihood(theta, tList):
+    """
+    Exact computation of the loglikelihood for an exponential Hawkes process for either self-exciting or self-regulating cases. 
+    Estimation for a single realization.
+    
+    Parameters
+    ----------
+    theta : tuple of float
+        Tuple containing the parameters to use for estimation.
+    tList : list of float
+        List containing all the lists of data (event times).
+
+    Returns
+    -------
+    likelihood : float
+        Value of likelihood, either for 1 realization or for a batch. 
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+    """
+    # Extract variables
+    lambda0, a, b = theta
+    
+
+    # Avoid wrong values in algorithm such as negative lambda0 or b
+    if lambda0 <= 0 or b <= 0:
+        return 1e5
+
+    else:
+
+        compensator_k = lambda0 * tList[1]
+        lambda_avant = lambda0
+        lambda_k = lambda0 + a
+       
+
+        if lambda_avant <= 0:
+            return 1e5
+
+        likelihood = np.log(lambda_avant) - compensator_k
+
+        # Iteration
+        for k in range(2, len(tList)-1):
+
+            if lambda_k >= 0:
+                C_k = lambda_k - lambda0
+                tau_star = tList[k] - tList[k - 1]
+            else:
+                C_k = -lambda0
+                tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+
+            lambda_avant = lambda0 + (lambda_k - lambda0) * np.exp(-b * (tList[k] - tList[k - 1]))
+            lambda_k = lambda_avant + a
+            compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+            
+            
+            
+            if lambda_avant <= 0:
+                return 1e5
+            
+            
+
+            likelihood += np.log(lambda_avant) - compensator_k
+        
+        k = len(tList)-1
+        
+        if lambda_k >= 0:
+            C_k = lambda_k - lambda0
+            tau_star = tList[k] - tList[k - 1]
+        else:
+            C_k = -lambda0
+            tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+
+        compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
+        
+        likelihood -=  compensator_k
+        # We return the opposite of the likelihood in order to use minimization packages.
+        
+        return (-likelihood)
+
+
+
+
+def multivariate_loglikelihood_simplified(theta, tList, dim=None, dimensional=False):
+    """
+
+    Parameters
+    ----------
+    theta : tuple of array
+        Tuple containing 3 arrays. First corresponds to vector of baseline intensities mu. Second is a square matrix
+        corresponding to interaction matrix a. Last is vector of recovery rates b.
+
+    tList : list of tuple
+        List containing tuples (t, m) where t is the time of event and m is the mark (dimension). The marks must go from
+        1 to nb_of_dimensions.
+        Important to note that this algorithm expects the first and last time to mark the beginning and
+        the horizon of the observed process. As such, first and last marks must be equal to 0, signifying that they are
+        not real event times.
+        The algorithm checks by itself if this condition is respected, otherwise it sets the beginning at 0 and the end
+        equal to the last time event.
+    dim : int
+        Number of processes only necessary if providing 1-dimensional theta. Default is None
+    dimensional : bool
+        Whether to return the sum of loglikelihood or decomposed in each dimension. Default is False.
+Returns
+    -------
+    likelihood : array of float
+        Value of likelihood at each process.
+        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
+    """
+
+    if isinstance(theta, np.ndarray):
+        if dim is None:
+            raise ValueError("Must provide dimension to unpack correctly")
+        else:
+            mu = np.array(theta[:dim]).reshape((dim, 1))
+            a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
+            b = np.array(theta[dim * (dim + 1):]).reshape((dim, 1))
+    else:
+        mu, a, b = (i.copy() for i in theta)
+    b = b + 1e-10
+
+    b_1 = 1/b
+
+    timestamps = tList.copy()
+
+    # We first check if we have the correct beginning and ending.
+    if timestamps[0][1] > 0:
+        timestamps = [(0, 0)] + timestamps
+    if timestamps[-1][1] > 0:
+        timestamps += [(timestamps[-1][0], 0)]
+
+    # Initialise values
+    tb, mb = timestamps[1]
+    
+    # Compensator between beginning and first event time
+    compensator = mu*(tb - timestamps[0][0])
+    # Intensity before first jump
+    log_i = np.zeros((a.shape[0],1))
+    log_i[mb-1] = np.log(mu[mb-1])
+    ic = mu + a[:, [mb - 1]]
+    # j=1
+
+    for tc, mc in timestamps[2:]:
+
+
+        # First we estimate the compensator
+        inside_log = (mu - np.minimum(ic, 0))/mu
+        # Restart time
+        t_star = tb + np.multiply(b_1, np.log(inside_log))
+
+        aux = 1/inside_log  # inside_log can't be equal to zero (coordinate-wise)
+        aux = np.minimum(1, aux)
+        
+        
+        compensator += (t_star < tc)*(np.multiply(mu, tc-t_star) + np.multiply(b_1, ic-mu)*(aux - np.exp(-b*(tc-tb))))
+
+        
+        # Then, estimation of intensity before next jump.
+        if mc > 0:
+            ic = mu + np.multiply((ic - mu), np.exp(-b*(tc-tb)))
+
+            if ic[mc - 1] <= 0.0:
+                # print("oh no")
+                # res = 1e8
+
+                # rayon_spec = np.max(np.abs(np.linalg.eig(np.abs(a) / b)[0]))
+                # rayon_spec = min(rayon_spec, 0.999)
+                # if 2*(tList[-1][0])/(1-rayon_spec) < 0:
+                #     print("wut")
+                # res = 2*(tList[-1][0])/(1-rayon_spec)
+
+                res = 1e8 #*(np.sum(mu**2) + np.sum(a**2) + np.sum(b**2))
+                return res
+            else:
+                log_i[mc-1] += np.log(ic[mc - 1])
+                
+            # j += 1
+            # print(j, ic, 1+0.45*(1-0.5**(j-1)))
+            ic += a[:, [mc - 1]]
+
+        tb = tc
+    likelihood = log_i - compensator
+    if not(dimensional):
+        likelihood = np.sum(likelihood)
+    return -likelihood
+
+
+def multivariate_likelihood_different_b(theta, tList,dim):
+    
+    
+    lambda0 = np.array(theta[:dim]).reshape((dim, 1))
+    a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
+    b = np.array(theta[dim * (dim + 1):]).reshape((dim, dim))
+
+    
+    b = b +1e-10
+    
+
+    
+    ## vecteur qui continent la somme des log( lambda_i ( T^i_k )), chaque ligne correspondant à un i différent
+    lambdai_Tk_i = np.zeros((dim,1))
+    
+    ## initialisation avec le premier saut
+    lambdai_Tk_i[tList[1][1]-1,0]+= np.log( lambda0[tList[1][1]-1,0])
+    
+    ## vecteur qui contient la somme des intégrales lambda_i entre T_{(k)} et T_{(k+1)}, chaque ligne correspondant à un i différent
+    ## on initialise par la valeur de l'intégrale entre à et T_{(1)}
+    inti_Tk = lambda0*tList[1][0]
+
+    previous_time =  tList[1][0]
+    
+    
+    ## matrice stockant, pour chaque saut les (a_{i,mk}) avec mk la composante qui a sauté au k-ième temps de saut, 
+    ## une ligne correspondant a un i . De même pour b
+    
+    a_jump = a[ :,tList[1][1]-1].reshape(dim,1)
+    b_jump = b[:,tList[1][1]-1].reshape(dim,1)
+
+    diff_time = np.array([])
+    
+
+    
+    for k in range(len(tList[2:-1])):
+        
+        time,compo = tList[k+2]
+        
+        diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
+        
+        lambdai_Tk_i[compo-1,0]+= np.log(lambda0[compo-1,0] + np.sum( a_jump[compo-1,:]* np.exp(-b_jump[compo-1,:]*diff_time)) )
+    
+        
+               
+               
+        inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
+              
+        previous_time = time 
+        
+        a_jump = np.concatenate((a[:,compo-1].reshape(dim,1),a_jump), axis=1)
+        b_jump = np.concatenate( (b[:,compo-1].reshape(dim,1),b_jump), axis=1)
+        
+    time = tList[-1][0]
+    diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
+        
+    inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
+   
+    #print(inti_Tk)
+    likelihood = np.sum(lambdai_Tk_i) - np.sum(inti_Tk)
+    
+     
+    return(-likelihood)
+
+
+    
+
+    time = tList[-1][0]
+    diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
+        
+    inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
+  
+    #print(inti_Tk)
+    likelihood = np.sum(lambdai_Tk_i) - np.sum(inti_Tk)
+    return(-likelihood)
+
+
+
+    if isinstance(theta, np.ndarray):
+        if dim is None:
+            raise ValueError("Must provide dimension to unpack correctly")
+        else:
+            mu = np.array(theta[:dim]).reshape((dim, 1))
+            a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
+            b = np.array(theta[dim * (dim + 1):]).reshape((dim, 1))
+    else:
+        mu, a, b = (i.copy() for i in theta)
+    b[b == 0] = 1
+
+    b_1 = 1/b
+    b_sum = b + b.T
+
+    timestamps = tList.copy()
+
+    # We first check if we have the correct beginning and ending.
+    if timestamps[0][1] > 0:
+        timestamps = [(0, 0)] + timestamps
+    if timestamps[-1][1] > 0:
+        timestamps += [(timestamps[-1][0], 0)]
+
+    # Initialise values
+    tb, mb = timestamps[1]
+    # Compensator between beginning and first event time
+    compensator_sq = (tb - timestamps[0][0])*np.sum(mu**2)
+    # Intensity before first jump
+    lambda_i = np.zeros((a.shape[0],1))
+    # for i in range(dim):
+    #     ax[0,i].scatter([tb], [lambda_i[i] + mu[i]], c="g")
+    lambda_i[mb-1] = lambda_i[mb-1] + mu[mb-1]
+    ic = mu + a[:, [mb - 1]]
+    # j=1
+
+    for tc, mc in timestamps[2:]:
+        # First we estimate the compensator
+        inside_log = (mu - np.minimum(ic, 0))/mu
+        # Restart time
+        t_star = np.zeros((dim,1))
+        for i in range(dim):
+            t_star[i] = tb + b_1[i]*np.log(inside_log[i])
+        # As we consider the cross-interactions in the integral.
+        t_star_ij = np.maximum(t_star, t_star.T)
+        first_term = np.zeros((dim, dim))
+        for i in range(dim):
+            for j in range(dim):
+                first_term[i,j] = mu[i]*mu[j] * (tc - t_star_ij[i,j])
+        middle_term = np.zeros((dim, dim))
+        for i in range(dim):
+            for j in range(dim):
+                middle_term[i,j] = (mu[i]*(ic[j] - mu[j])/b[j])*(np.exp(-b[j]*(t_star_ij[i,j] - tb)) - np.exp(-b[j]*(tc-tb)))
+        aux2 = middle_term.copy()
+        for i in range(dim):
+            for j in range(dim):
+                middle_term[i,j] = aux2[i,j] + aux2[j,i]
+        last_term = np.zeros((dim, dim))
+        for i in range(dim):
+            for j in range(dim):
+                last_term[i,j] = ((ic[i] - mu[i])*(ic[j] - mu[j])/(b[i] + b[j]))*(np.exp(-(b[i] + b[j])*(t_star_ij[i,j] - tb)) - np.exp(-(b[i] + b[j])*(tc-tb)))
+
+        aux = np.zeros((dim, dim))
+
+        for i in range(dim):
+            for j in range(dim):
+                if t_star_ij[i,j] < tc:
+                    aux[i,j] = first_term[i,j] + middle_term[i,j] + last_term[i,j]
+
+        for i in range(dim):
+            for j in range(dim):
+                compensator_sq += aux[i,j]
+
+        # Then, estimation of intensity before next jump.
+        if mc > 0:
+            ic = mu + np.multiply((ic - mu), np.exp(-b*(tc-tb)))
+            # for i in range(dim):
+            #     ax[0,i].scatter([tc], [ic[i]], c="g")
+
+            lambda_i[mc-1] += np.maximum(ic[mc - 1], 0)
+            # j += 1
+            # print(j, ic, 1+0.45*(1-0.5**(j-1)))
+            ic += a[:, [mc - 1]]
+
+        tb = tc
+    least_squares_error = compensator_sq - (2/timestamps[-1][0])*np.sum(lambda_i)
+    return least_squares_error
+
+
+
+
+
+"""
+    FIN
+"""
+
+
+
+
