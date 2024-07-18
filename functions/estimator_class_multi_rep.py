@@ -89,7 +89,7 @@ class estimator_unidim_multi_rep(object):
 
         if self.mark: 
             
-            self.loss = function_to_optimize
+            self.loss = opimisation_marked_hawkes
             self.bounds = bound_f + bound_phi+  [(0.0, None), (a_bound, None), (0.0,bound_b)]
             self.initial_guess = initial_guess_f+ initial_guess_phi + initial_guess
 
@@ -101,20 +101,15 @@ class estimator_unidim_multi_rep(object):
 
         
 
-    def fit(self, timestamps , markList=[], nb_cores=None):
+    def fit(self, timestamps ,nb_cores=None):
         
         """
         Fit the Unidim Hawkes model to a list of realisations
 
         Parameters
         ----------
-        timestamps : list of list or array
-            List of ordered list containing event times.
-            
-            
-        markList : list of list of array 
-            List containing the value of the mark for each event of the list timestamps
-            This argument is necessery if mark = True 
+        timestamps : list containing lists of tuples 
+            List of ordered list containing event times, component and mark value.
 
         nb_cores : int or None
             Number of core to use during the estimation
@@ -131,14 +126,12 @@ class estimator_unidim_multi_rep(object):
             
             self.mark_list = timestamps
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
+            results = pool.map(functools.partial(minimization_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
             pool.close()
 
         else: 
-
-            self.mark_list = markList
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump, self.mark_list)
+            results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump)
             pool.close()
             
 
@@ -249,9 +242,6 @@ class estimator_unidim_multi_rep(object):
         ks_test = kstest( test_stat, cdf='norm')
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
-    
-
-
 
 
 
@@ -420,20 +410,6 @@ class estimator_multidim_multi_rep(object):
             Number of core to use during the estimation
                
         """
-
-
-        self.time_jump = timestamps
-        
-        if self.mark:
-            argument = (self.time_jump, self.name_arg_phi,self.name_arg_f, self.phi,self.f, self.nb_arg_phi, self.dim)
-        else: 
-            argument = (self.time_jump)
-
-        self.res = minimize(self.loss, self.initial_guess, method="L-BFGS-B", 
-                args=argument,
-                bounds=self.bounds,
-                options=self.options)
-        
         
         self.time_jump = timestamps
 
@@ -444,14 +420,14 @@ class estimator_multidim_multi_rep(object):
             
             self.mark_list = timestamps
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
+            results = pool.map(functools.partial(minimization_multidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options, dim = self.dim) , self.time_jump)
             pool.close()
 
         else: 
 
             self.mark_list = markList
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump, self.mark_list)
+            results = pool.map( functools.partial(minimization_multidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options, dim = self.dim) , self.time_jump, self.mark_list)
             pool.close()
             
 

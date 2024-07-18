@@ -29,86 +29,7 @@ def likelihood_Poisson(theta, tList):
 
     return(-loglik)
 
-
-def likelihood_with_refractory_period(theta,delay,tList):
-    
-    """
-    Exact computation of the loglikelihood for an exponential Hawkes process for either self-exciting or self-regulating cases. 
-    Estimation for a single realization.
-    
-    Parameters
-    ----------
-    theta : tuple of float
-        Tuple containing the parameters to use for estimation.
-    tList : list of float
-        List containing all the lists of data (event times).
-
-    Returns
-    -------
-    likelihood : float
-        Value of likelihood, either for 1 realization or for a batch. 
-        The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
-    """
-    # Extract variables
-    lambda0, a, b = theta
-    
-
-    # Avoid wrong values in algorithm such as negative lambda0 or b
-    if lambda0 <= 0 or b <= 0:
-        return 1e5
-
-    else:
-
-        compensator_k = lambda0 * tList[1] ##  int_(Tk,Tk+1) lambda(t)dt
-        lambda_avant = lambda0 ##  lambda(Tk)
-        lambda_k = lambda0 + a ##  lambda((Tk+delay)^+)
-
-        if lambda_avant <= 0:
-            return 1e5
-
-        likelihood = np.log(lambda_avant) - compensator_k
-        old_time = tList[1]
-        
-        # Iteration
-        for time in tList[2:-1]:
-            
-            tau_star = time - old_time - delay - b**(-1)*np.log( (lambda0- lambda_k*(lambda_k<=0))/lambda0)
-            C_k = lambda_k*(lambda_k>=0)- lambda0
-
-
-            lambda_avant = (lambda0 + (lambda_k - lambda0) * np.exp(-b * (time - old_time-delay)))*(time-old_time>delay)
-            lambda_k = lambda_avant + a
-            compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
-            
-
-     
-            old_time = time
-            
-            if lambda_avant <= 0:
-                return 1e5           
-
-
-            likelihood += np.log(lambda_avant) - compensator_k
-        
-        time =tList[-1]
-        old_time = tList[-2]
-        
-        tau_star = time - old_time - delay - b**(-1)*np.log( (lambda0- lambda_k*(lambda_k<=0))/lambda0)
-        C_k = lambda_k*(lambda_k>=0)- lambda0
-
-        compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
-        
-
-
-        likelihood -=  compensator_k
-        
-        
-
-    return(-likelihood)
-    
-    
-
-# Functions for exponential estimation of loglikelihood.
+ 
 
 def likelihood_daichan(a, mu, b, tList):
 
@@ -266,7 +187,7 @@ def function_to_optimize(x:list, tList:list, markeList:list, name_arg_f, name_ar
 
 
 
-def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, options):
+def minimization_multidim(list_times, loss, initial_guess, bounds, options):
      return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
 
 
@@ -275,6 +196,13 @@ def minimization_unidim_unmark(list_times, loss, initial_guess, bounds, options)
 
 def minimization_unidim_marked(x,y,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
     return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x, y, name_arg_f,name_arg_phi,f,phi)))
+
+
+def minimization_multidim_marked(x,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
+    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x,name_arg_f,name_arg_phi,f,phi)))
+
+def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, options, dim):
+     return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times, dim), bounds=bounds, options=options))
 
 
 def multivariate_marked_likelihood( theta, tList, phi = lambda x : 1, f = lambda x : 1, arg_phi ={} ,arg_f={}, dim=None, dimensional=False):
@@ -390,8 +318,6 @@ def opimisation_marked_hawkes(x:list, tList: list, name_arg_phi: list, name_arg_
     
     return(multivariate_marked_likelihood(theta, tList, phi, f, arg_phi, arg_f, dim=dim))
 
-    
-      
     
 def loglikelihood(theta, tList):
     """
