@@ -507,7 +507,7 @@ class estimator_multidim_multi_rep(object):
         return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
-    def Test_one_coeff(self, index_coeff, theta_star):
+    def test_one_coeff(self, index_coeff, theta_star):
 
 
         """
@@ -525,13 +525,11 @@ class estimator_multidim_multi_rep(object):
         
         """
 
-        if (self.mark or (self.index == 1 and theta_star<=0)):
+        if (self.mark or (index_coeff == 1 and theta_star<=0)):
             print("No theoretical garantee associated to this test")
 
-        if self.index_coeff !=4 :
-            coeff = self.params_estim[:,index_coeff]
-        else : 
-            coeff = self.params_estim[:,1]
+
+        coeff = self.params_estim[:,index_coeff]
         
         test_stat = (coeff-theta_star)/np.std(coeff)
 
