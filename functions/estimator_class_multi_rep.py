@@ -126,7 +126,7 @@ class estimator_unidim_multi_rep(object):
             
             self.mark_list = timestamps
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map(functools.partial(minimization_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
+            results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
             pool.close()
 
         else: 
@@ -242,6 +242,7 @@ class estimator_unidim_multi_rep(object):
         ks_test = kstest( test_stat, cdf='norm')
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
+
 
 
 
@@ -537,6 +538,34 @@ class estimator_multidim_multi_rep(object):
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
     
+    def test_equality_coeff(self, index_1, index_2):
+
+
+        """
+        Perform an equality test on a coefficient of the model 
+
+
+        Parameters
+        ----------
+
+        index : int
+            Index of the paramter, inside the list self.param_theta, that is tested. index = 0 for mu, index = 1 for a, index = 2 b and index = 4 for arg_phi
+          
+        theta_star : float
+            Value of the true parameter to test
+        
+        """
+
+        if (self.mark) :
+            print("No theoretical garantee associated to this test")
+
+        cov_mat = np.cov(self.params_estim[:,index_1], self.params_estim[:,index_2]) 
+        stat = (self.params_estim[:,index_1] - self.params_estim[:,index_2])/ np.sqrt( cov_mat[0,0]+ cov_mat[1,1]-2*cov_mat[0,1]  )
+        ks_test = kstest( stat, cdf='norm')
+
+        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
+
+
 
 
 
