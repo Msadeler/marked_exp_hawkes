@@ -4,6 +4,7 @@ from functions.GOF import *
 from functions.compensator import *
 import multiprocessing
 import functools
+from functions.display_qqconf import *
 
 
 class estimator_unidim_multi_rep(object):
@@ -208,6 +209,9 @@ class estimator_unidim_multi_rep(object):
 
         KS_test = kstest(results, cdf = 'uniform')
         
+        with r_inline_plot():
+            uniformity_test( robjects.FloatVector(results))
+        
         return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
@@ -240,6 +244,9 @@ class estimator_unidim_multi_rep(object):
         test_stat = (coeff-theta_star)/np.std(coeff)
 
         ks_test = kstest( test_stat, cdf='norm')
+        
+        with r_inline_plot():
+            normality_test( robjects.FloatVector(test_stat))
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
@@ -505,6 +512,9 @@ class estimator_multidim_multi_rep(object):
 
         KS_test = kstest(results, cdf = 'uniform')
         
+        with r_inline_plot():
+            uniformity_test( robjects.FloatVector(results))
+        
         return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
@@ -535,6 +545,8 @@ class estimator_multidim_multi_rep(object):
         test_stat = (coeff-theta_star)/np.std(coeff)
 
         ks_test = kstest( test_stat, cdf='norm')
+        
+        
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
     
@@ -562,6 +574,11 @@ class estimator_multidim_multi_rep(object):
         cov_mat = np.cov(self.params_estim[:,index_1], self.params_estim[:,index_2]) 
         stat = (self.params_estim[:,index_1] - self.params_estim[:,index_2])/ np.sqrt( cov_mat[0,0]+ cov_mat[1,1]-2*cov_mat[0,1]  )
         ks_test = kstest( stat, cdf='norm')
+        
+        
+        with r_inline_plot():
+            normality_test( robjects.FloatVector(stat))
+       
 
         return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
