@@ -156,7 +156,7 @@ class estimator_unidim_multi_rep(object):
     
 
     def GOF_bootstrap(self, 
-                      sup_compensator,
+                      sup_compensator=None,
                       SubSample_size= None, 
                       Nb_SubSample = 500,
                       nb_cores = -1, 
@@ -197,8 +197,12 @@ class estimator_unidim_multi_rep(object):
         
         if not SubSample_size:
             SubSample_size = int(sample_size**(2/3))
+x
 
-
+        pool = multiprocessing.Pool(nb_cores)                         
+        results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump)
+        pool.close()
+        
         subsample = [np.random.choice([k for k in range(sample_size)], size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
 
         results = []
