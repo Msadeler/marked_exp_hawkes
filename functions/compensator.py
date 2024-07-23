@@ -1,13 +1,13 @@
 """
-    Fonctions computing the values of the compensator at each 
+    Fonctions computing the values of the compensator for different models 
 """
 import numpy as np
 
-def poisson_compenasator(theta, tList, **kwargs):
+def poisson_compensator(tList,theta, **kwargs):
     return([theta[0]*time for time in tList[1:]])
 
 
-def unidim_MEHP_compensator(theta, tList, markeList, phi=lambda mark, t : 1, arg_f={}, arg_phi={}):
+def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_phi={}):
     
     
     """
@@ -18,11 +18,9 @@ def unidim_MEHP_compensator(theta, tList, markeList, phi=lambda mark, t : 1, arg
     theta : tuple of float
         Tuple containing the parameters of the hawkes.
         
-    tList : list of float
-        List containing all the event times.
-        
-    markeList: list of float 
-        List containing the value of the mark at the time of each jump in tList
+    tList : list of tuple
+        List of tuple containing all the event times and the value of the mark at each timestamps.
+        The first tuple must contains the time t0 at which the simulation begins and the last tuple must contains the value of Tmax, maximum time for which the process has been record. 
         
     f: density function
         The density of the mark , the density must have at list two paramaters: the mark value (first argment) and the time value (second one)
@@ -58,16 +56,16 @@ def unidim_MEHP_compensator(theta, tList, markeList, phi=lambda mark, t : 1, arg
     
     # Compensator between beginning and first event time
     
-    compensator = mu*(last_time - tList[0])
+    compensator = mu*(last_time - tList[0][0])
     transformed_times += [compensator]
     
     
     # Intensity 
-    ic = mu + a*phi(markeList[1], **arg_phi, **arg_f)
+    ic = mu + a*phi( tList[0][1], **arg_phi, **arg_f)
     
     
 
-    for time, mark in zip(tList[2:-1], markeList[2:-1]):
+    for time, mark in zip(tList[2:]):
                 
         # First we estimate the compensator
         
@@ -89,7 +87,7 @@ def unidim_MEHP_compensator(theta, tList, markeList, phi=lambda mark, t : 1, arg
                 
     return transformed_times
 
-def unidim_EHP_compensator(theta, tList, **kwargs):
+def unidim_EHP_compensator(tList,theta, **kwargs):
 
     
     """
@@ -101,8 +99,8 @@ def unidim_EHP_compensator(theta, tList, **kwargs):
         Tuple containing the parameters of the hawkes.
         
     tList : list of float
-        List containing all the event times.
-
+        List containing all the event times. 
+        The first time must contains the time t0 at which the recording of the process begins and the last time must be the value of Tmax, maximum time for which the process has been record. 
 
     Returns
     -------
@@ -155,7 +153,7 @@ def unidim_EHP_compensator(theta, tList, **kwargs):
     return np.array(transformed_times)
 
 
-def multi_EHP_compensator(theta, tList,**kwargs):
+def multi_EHP_compensator(tList, theta,**kwargs):
 
 
     """
@@ -229,7 +227,7 @@ def multi_EHP_compensator(theta, tList,**kwargs):
     return transformed_times, individual_transformed_times
 
 
-def multi_MEHP_compensator(theta, tList, phi={}, arg_phi={}, arg_f={}):
+def multi_MEHP_compensator(tList,theta, phi={}, arg_phi={}, arg_f={}):
     
     if isinstance(theta, np.ndarray):
                 
@@ -261,7 +259,7 @@ def multi_MEHP_compensator(theta, tList, phi={}, arg_phi={}, arg_f={}):
     ic = mu + a[:, [dim_b - 1]]*(phi(mark_b, **arg_phi, **arg_f)[:, [dim_b - 1]])
     # j=1
 
-    for time_c, dim_c, mark_c in tList[2:-1]:
+    for time_c, dim_c, mark_c in tList[2:]:
         # First we estimate the compensator
         inside_log = (mu - np.minimum(ic, 0))/mu
         # Restart time

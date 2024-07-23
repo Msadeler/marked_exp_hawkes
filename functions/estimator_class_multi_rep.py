@@ -158,7 +158,7 @@ class estimator_unidim_multi_rep(object):
     def GOF_bootstrap(self, 
                       sup_compensator=None,
                       SubSample_size= None, 
-                      Nb_SubSample = 500,
+                      Nb_SubSample = 50,
                       nb_cores = -1, 
                       compensator_func = unidim_EHP_compensator):
         
@@ -170,8 +170,8 @@ class estimator_unidim_multi_rep(object):
         Parameters
         ----------
 
-        sup_compensator : float
-            Parameter that is, a.s, less than the mean size of the interval of realisation of the cumulated process   
+        sup_compensator : float or None, default value is None
+            Parameter that is, a.s, less than the mean size of the interval of realisation of the cumulated process. If not value is given, sup_compensator is equal to 0.9 times the sum of the values Lambdai(Tmax)
 
           
         SubSample_size : int or None
@@ -180,8 +180,8 @@ class estimator_unidim_multi_rep(object):
         Nb_SubSample : int or None
             Number of time the bootstrap procedure is done. Set to 500 by default.
 
-        nb_cores: int or None
-            Number of core to use 
+        nb_cores: int default value is -1
+            Number of core to use, if the value, is -1, all cores are used
 
         compensator_func : Function 
             Compensator associated to the tested model.  
@@ -193,33 +193,39 @@ class estimator_unidim_multi_rep(object):
         sample_size = len(self.time_jump)
 
         if nb_cores==-1: 
-            nb_cores = multiprocessing.cpu_count()-1 
+            nb_cores = multiprocessing.cpu_count()
         
         if not SubSample_size:
             SubSample_size = int(sample_size**(2/3))
-x
 
-        pool = multiprocessing.Pool(nb_cores)                         
-        results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump)
+
+        ## apply time transformation to all realisation 
+        pool = multiprocessing.pool.ThreadPool(nb_cores)     
+        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_theta, sup_compensator=None, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.time_jump)
         pool.close()
         
-        subsample = [np.random.choice([k for k in range(sample_size)], size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
-
-        results = []
-
-        for index in subsample:
-            results+=[GOF_procedure(index,theta=self.mean_theta, tList=self.time_jump, markList=self.mark_list, compensator_func=compensator_func, sup_compensator=sup_compensator, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg)]
-     
-
-        KS_test = kstest(results, cdf = 'uniform')
+        ### select a subsample 
+        subsample = [np.random.choice(np.arange(sample_size), size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
+        subsample_times = [[time_transformed[k] for k in index] for index in subsample]
+        ## foor each subsample, perform gof procedure by aggegating transformed process and compute
+        ## the associated pval
         
+        
+        pool = multiprocessing.pool.ThreadPool(nb_cores)     
+        pval_list = pool.map(functools.partial(GOF_procedure,sup_compensator=sup_compensator), subsample_times)
+        pool.close()
+
+
+        KS_test = kstest(pval_list, cdf = 'uniform')
+        
+        ## display qqconf plot of the pvalue
         with r_inline_plot():
-            uniformity_test( robjects.FloatVector(results))
+            uniformity_test( robjects.FloatVector(pval_list))
         
-        return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
+        return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
-    def Test_one_coeff(self, index_coeff, theta_star):
+    def test_one_coeff(self, index_coeff, theta_star):
 
 
         """
@@ -237,13 +243,10 @@ x
         
         """
 
-        if (self.mark or (self.index == 1 and theta_star<=0)):
+        if (self.mark or theta_star<=0):
             print("No theoretical garantee associated to this test")
-
-        if self.index_coeff !=4 :
-            coeff = self.params_estim[:,index_coeff]
-        else : 
-            coeff = self.params_estim[:,1]
+            
+        coeff = self.params_estim[:,index_coeff]
         
         test_stat = (coeff-theta_star)/np.std(coeff)
 
@@ -254,7 +257,36 @@ x
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
+    def test_equality_coeff(self, index_1, index_2):
 
+
+        """
+        Perform an equality test on a coefficient of the model 
+
+
+        Parameters
+        ----------
+
+        index_1, index_2 : int
+            Indexes of the paramters, inside the list self.param_theta, whose equality is tested. 
+        
+        """
+
+        if (self.mark) :
+            print("No theoretical garantee associated to this test")
+
+        cov_mat = np.cov(self.params_estim[:,index_1], self.params_estim[:,index_2]) 
+        stat = (self.params_estim[:,index_1] - self.params_estim[:,index_2])/ np.sqrt( cov_mat[0,0]+ cov_mat[1,1]-2*cov_mat[0,1]  )
+        ks_test = kstest( stat, cdf='norm')
+        
+        
+        with r_inline_plot():
+            normality_test( robjects.FloatVector(stat))
+       
+
+        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
+
+        
 
 
 class estimator_multidim_multi_rep(object):
@@ -401,8 +433,6 @@ class estimator_multidim_multi_rep(object):
             
         self.fitted = False
             
-
-
     def fit(self, timestamps , markList=[], nb_cores=None):
         
         """
