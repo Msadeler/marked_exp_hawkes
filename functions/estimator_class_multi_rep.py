@@ -12,7 +12,7 @@ class estimator_unidim_multi_rep(object):
     def __init__(self,
                 loss = loglikelihood,
                 a_bound = None, 
-                initial_guess=np.array((1.0, 0.0, 1.0)), 
+                initial_guess=[1.0, 0.0, 1.0], 
                 options={'disp': False},
                 mark=False,
                 name_arg_phi=[], 
@@ -90,7 +90,7 @@ class estimator_unidim_multi_rep(object):
 
         if self.mark: 
             
-            self.loss = opimisation_marked_hawkes
+            self.loss = loglikelihoodMarkedHawkes
             self.bounds = bound_f + bound_phi+  [(0.0, None), (a_bound, None), (0.0,bound_b)]
             self.initial_guess = initial_guess_f+ initial_guess_phi + initial_guess
 

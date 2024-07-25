@@ -82,7 +82,7 @@ def likelihood_daichan(a, mu, b, tList):
 
 
 
-def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_f={}):
+def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi,):
     
     """
     Exact computation of the loglikelihood for an exponential marked Hawkes process. 
@@ -118,7 +118,10 @@ def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_
         Value of likelihood 
         The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
     """
-   
+    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
+    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+    theta = x[len(name_arg_f)+len(name_arg_phi):]  
+    
     # unpack hawkes parameters 
     lambda0, a, b  = theta
 
@@ -126,9 +129,9 @@ def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_
         return 1e5
     
     else: 
-        compensator_k = lambda0 * tList[1]
+        compensator_k = lambda0 * (tList[1][0]-tList[0][0])
         lambda_avant = lambda0
-        lambda_k = lambda0 + a*phi(markeList[1],**arg_phi, **arg_f)
+        lambda_k = lambda0 + a*phi(tList[1][1],**arg_phi, **arg_f)
     
     likelihood = np.log(lambda_avant) - compensator_k
     
@@ -137,13 +140,13 @@ def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_
         
         if lambda_k >= 0:
             C_k = lambda_k - lambda0
-            tau_star = tList[k] - tList[k - 1]
+            tau_star = tList[k][0] - tList[k - 1][0]
         else:
             C_k = -lambda0
-            tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+            tau_star = tList[k][0] - tList[k - 1][0] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
 
         lambda_avant = lambda0 + (lambda_k - lambda0) * np.exp(-b * (tList[k] - tList[k - 1]))
-        lambda_k = lambda_avant + a*phi(markeList[k],**arg_phi, **arg_f)
+        lambda_k = lambda_avant + a*phi(tList[k][1],**arg_phi, **arg_f)
         compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
 
         if lambda_avant <= 0:
@@ -154,10 +157,10 @@ def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_
 
     if lambda_k >= 0:
         C_k = lambda_k - lambda0
-        tau_star = tList[k] - tList[k - 1]
+        tau_star = tList[k][0] - tList[k - 1][0]
     else:
         C_k = -lambda0
-        tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
+        tau_star = tList[k][0] - tList[k - 1][0] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
 
     compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
 
@@ -169,22 +172,12 @@ def loglikelihoodMarkedHawkes(theta, tList ,markeList, f, phi, arg_phi ={}, arg_
     
     
         
-    likelihood_mark = list(map(lambda x,y: np.log(f(x, y, **arg_f)), markeList[1:-1], tList[1:-1]))
+    likelihood_mark = list(map(lambda x: np.log(f(x[0], x[1], **arg_f)), tList[1:-1]))
     
     likelihood+=sum(likelihood_mark)
     
      # We return the opposite of the likelihood in order to use minimization packages.
     return -likelihood
-
-    
-def function_to_optimize(x:list, tList:list, markeList:list, name_arg_f, name_arg_phi, f, phi):
-    
-    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
-    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
-    theta = x[len(name_arg_f)+len(name_arg_phi):]         
-
-    return(loglikelihoodMarkedHawkes(theta, tList, markeList, f, phi, arg_phi, arg_f))
-
 
 
 def minimization_multidim(list_times, loss, initial_guess, bounds, options):
@@ -194,8 +187,8 @@ def minimization_multidim(list_times, loss, initial_guess, bounds, options):
 def minimization_unidim_unmark(list_times, loss, initial_guess, bounds, options):
      return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
 
-def minimization_unidim_marked(x,y,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
-    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x, y, name_arg_f,name_arg_phi,f,phi)))
+def minimization_unidim_marked(x,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
+    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x, name_arg_f,name_arg_phi,f,phi)))
 
 
 def minimization_multidim_marked(x,loss, initial_guess,f,phi, name_arg_f, name_arg_phi):
@@ -205,9 +198,8 @@ def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, option
      return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times, dim), bounds=bounds, options=options))
 
 
-def multivariate_marked_likelihood( theta, tList, phi = lambda x : 1, f = lambda x : 1, arg_phi ={} ,arg_f={}, dim=None, dimensional=False):
+def multivariate_marked_likelihood(x:list, tList: list, name_arg_phi: list, name_arg_f,phi ,f, nb_arg_phi, dim=None, dimensional=False):
     """
-
     Parameters
     ----------
     theta : tuple of array
@@ -233,6 +225,19 @@ Returns
         Value of likelihood at each process.
         The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
     """
+    
+    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
+    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+    theta = x[len(name_arg_f)+len(name_arg_phi):]         
+    
+    
+    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
+    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+    theta = x[len(name_arg_f)+len(name_arg_phi):]    
+    
+   
+   
+   
     if isinstance(theta, np.ndarray):
         if dim is None:
             raise ValueError("Must provide dimension to unpack correctly")
@@ -308,16 +313,6 @@ Returns
         
     return -likelihood
         
-
-
-def opimisation_marked_hawkes(x:list, tList: list, name_arg_phi: list, name_arg_f,phi ,f, nb_arg_phi, dim:int):
-    
-    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
-    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
-    theta = x[len(name_arg_f)+len(name_arg_phi):]         
-    
-    return(multivariate_marked_likelihood(theta, tList, phi, f, arg_phi, arg_f, dim=dim))
-
     
 def loglikelihood(theta, tList):
     """
@@ -395,8 +390,6 @@ def loglikelihood(theta, tList):
         # We return the opposite of the likelihood in order to use minimization packages.
         
         return (-likelihood)
-
-
 
 
 def multivariate_loglikelihood_simplified(theta, tList, dim=None, dimensional=False):
@@ -567,108 +560,6 @@ def multivariate_likelihood_different_b(theta, tList,dim):
     
      
     return(-likelihood)
-
-
-    
-
-    time = tList[-1][0]
-    diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
-        
-    inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
-  
-    #print(inti_Tk)
-    likelihood = np.sum(lambdai_Tk_i) - np.sum(inti_Tk)
-    return(-likelihood)
-
-
-
-    if isinstance(theta, np.ndarray):
-        if dim is None:
-            raise ValueError("Must provide dimension to unpack correctly")
-        else:
-            mu = np.array(theta[:dim]).reshape((dim, 1))
-            a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
-            b = np.array(theta[dim * (dim + 1):]).reshape((dim, 1))
-    else:
-        mu, a, b = (i.copy() for i in theta)
-    b[b == 0] = 1
-
-    b_1 = 1/b
-    b_sum = b + b.T
-
-    timestamps = tList.copy()
-
-    # We first check if we have the correct beginning and ending.
-    if timestamps[0][1] > 0:
-        timestamps = [(0, 0)] + timestamps
-    if timestamps[-1][1] > 0:
-        timestamps += [(timestamps[-1][0], 0)]
-
-    # Initialise values
-    tb, mb = timestamps[1]
-    # Compensator between beginning and first event time
-    compensator_sq = (tb - timestamps[0][0])*np.sum(mu**2)
-    # Intensity before first jump
-    lambda_i = np.zeros((a.shape[0],1))
-    # for i in range(dim):
-    #     ax[0,i].scatter([tb], [lambda_i[i] + mu[i]], c="g")
-    lambda_i[mb-1] = lambda_i[mb-1] + mu[mb-1]
-    ic = mu + a[:, [mb - 1]]
-    # j=1
-
-    for tc, mc in timestamps[2:]:
-        # First we estimate the compensator
-        inside_log = (mu - np.minimum(ic, 0))/mu
-        # Restart time
-        t_star = np.zeros((dim,1))
-        for i in range(dim):
-            t_star[i] = tb + b_1[i]*np.log(inside_log[i])
-        # As we consider the cross-interactions in the integral.
-        t_star_ij = np.maximum(t_star, t_star.T)
-        first_term = np.zeros((dim, dim))
-        for i in range(dim):
-            for j in range(dim):
-                first_term[i,j] = mu[i]*mu[j] * (tc - t_star_ij[i,j])
-        middle_term = np.zeros((dim, dim))
-        for i in range(dim):
-            for j in range(dim):
-                middle_term[i,j] = (mu[i]*(ic[j] - mu[j])/b[j])*(np.exp(-b[j]*(t_star_ij[i,j] - tb)) - np.exp(-b[j]*(tc-tb)))
-        aux2 = middle_term.copy()
-        for i in range(dim):
-            for j in range(dim):
-                middle_term[i,j] = aux2[i,j] + aux2[j,i]
-        last_term = np.zeros((dim, dim))
-        for i in range(dim):
-            for j in range(dim):
-                last_term[i,j] = ((ic[i] - mu[i])*(ic[j] - mu[j])/(b[i] + b[j]))*(np.exp(-(b[i] + b[j])*(t_star_ij[i,j] - tb)) - np.exp(-(b[i] + b[j])*(tc-tb)))
-
-        aux = np.zeros((dim, dim))
-
-        for i in range(dim):
-            for j in range(dim):
-                if t_star_ij[i,j] < tc:
-                    aux[i,j] = first_term[i,j] + middle_term[i,j] + last_term[i,j]
-
-        for i in range(dim):
-            for j in range(dim):
-                compensator_sq += aux[i,j]
-
-        # Then, estimation of intensity before next jump.
-        if mc > 0:
-            ic = mu + np.multiply((ic - mu), np.exp(-b*(tc-tb)))
-            # for i in range(dim):
-            #     ax[0,i].scatter([tc], [ic[i]], c="g")
-
-            lambda_i[mc-1] += np.maximum(ic[mc - 1], 0)
-            # j += 1
-            # print(j, ic, 1+0.45*(1-0.5**(j-1)))
-            ic += a[:, [mc - 1]]
-
-        tb = tc
-    least_squares_error = compensator_sq - (2/timestamps[-1][0])*np.sum(lambda_i)
-    return least_squares_error
-
-
 
 
 

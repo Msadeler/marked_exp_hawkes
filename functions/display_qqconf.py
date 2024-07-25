@@ -9,7 +9,7 @@ from rpy2.robjects.packages import importr
 rqqconf = importr('qqconf')
 rstats = importr('stats')
 robjects.r('''
-           uniformity_test <- function(pvals, alpha = 0.05)
+           uniformity_test <- function(pvals, alpha = 0.05, min = 0, max = 1)
            {
            qq_conf_plot(pvals, 
            distribution = qunif, 
