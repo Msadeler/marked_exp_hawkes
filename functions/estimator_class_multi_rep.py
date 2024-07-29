@@ -124,19 +124,16 @@ class estimator_unidim_multi_rep(object):
             nb_cores = multiprocessing.cpu_count()-1 
         
         if not self.mark :
-            
-            self.mark_list = timestamps
             pool = multiprocessing.Pool(nb_cores)                         
             results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
             pool.close()
 
         else: 
+
             pool = multiprocessing.Pool(nb_cores)                         
             results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump)
             pool.close()
             
-
-    
 
         self.res_list = results
             
@@ -145,8 +142,10 @@ class estimator_unidim_multi_rep(object):
         self.mean_theta = self.mean_MLE[-3:]
         
         if self.mark:
-            self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[0]))
-            self.mean_phi_arg = dict(zip(self.name_arg_phi, self.mean_MLE[1]))
+            self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
+            self.mean_phi_arg = dict(zip(self.name_arg_phi,
+                                         self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
+
         else : 
             self.mean_f_arg = {}
             self.mean_phi_arg = {}
@@ -218,10 +217,10 @@ class estimator_unidim_multi_rep(object):
 
         KS_test = kstest(pval_list, cdf = 'uniform')
         
-        ## display qqconf plot of the pvalue
+       ## display qqconf plot of the pvalue
         with r_inline_plot():
             uniformity_test( robjects.FloatVector(pval_list))
-        
+     
         return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
@@ -421,7 +420,7 @@ class estimator_multidim_multi_rep(object):
         
         
         if self.mark:     
-            self.loss = opimisation_marked_hawkes
+            self.loss = multivariate_marked_likelihood
             self.bounds =  bound_f + bound_phi+  self.bounds
             self.initial_guess = np.array(initial_guess_f+ initial_guess_phi + self.initial_guess)         
             self.nb_arg_phi = len(bound_phi)
@@ -482,8 +481,10 @@ class estimator_multidim_multi_rep(object):
         self.mean_theta = self.mean_MLE[-3:]
         
         if self.mark:
-            self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[0]))
-            self.mean_phi_arg = dict(zip(self.name_arg_phi, self.mean_MLE[1]))
+            self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
+            self.mean_phi_arg = dict(zip(self.name_arg_phi,
+                                         self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
+
         else : 
             self.mean_f_arg = {}
             self.mean_phi_arg = {}
