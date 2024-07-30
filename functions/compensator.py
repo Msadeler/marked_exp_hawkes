@@ -52,7 +52,7 @@ def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_
     transformed_times = []
 
     # Initialise values
-    last_time = tList[1]
+    last_time = tList[1][0]
     
     # Compensator between beginning and first event time
     
@@ -65,7 +65,7 @@ def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_
     
     
 
-    for time, mark in zip(tList[2:]):
+    for time, mark in tList[2:]:
                 
         # First we estimate the compensator
         

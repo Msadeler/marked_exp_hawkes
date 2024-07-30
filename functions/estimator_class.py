@@ -203,7 +203,7 @@ class loglikelihood_estimator_bfgs(object):
 
         if self.mark: 
             
-            self.loss = function_to_optimize
+            self.loss = loglikelihoodMarkedHawkes
             self.bounds = bound_f + bound_phi+  [(0.0, None), (a_bound, None), (0.0,bound_beta)]
             self.initial_guess = initial_guess_f+ initial_guess_phi + [1.0, 0.0, 1.0]
 
@@ -216,7 +216,7 @@ class loglikelihood_estimator_bfgs(object):
             
             
 
-    def fit(self, timestamps:list , markList=[]):
+    def fit(self, timestamps:list):
         
         """
         Parameters
@@ -233,14 +233,7 @@ class loglikelihood_estimator_bfgs(object):
         
         
         self.time_jump = timestamps
-
-        
-        if not self.mark :
-            arguments = (timestamps)
-            
-        else: 
-            self.mark_list = markList
-            arguments  = (self.time_jump, self.mark_list, self.name_arg_f, self.name_arg_phi, self.f, self.phi)
+        arguments  = (self.time_jump, self.name_arg_f, self.name_arg_phi, self.f, self.phi)
             
     
         self.res = minimize(self.loss, self.initial_guess, method="L-BFGS-B",

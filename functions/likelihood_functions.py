@@ -134,7 +134,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         lambda_avant = lambda0
         lambda_k = lambda0 + a*phi(tList[1][1],**arg_phi, **arg_f)
     
-    likelihood = np.log(lambda_avant) - compensator_k
+    likelihood = np.log(lambda_avant) - compensator_k +  f(tList[1][0], tList[1][1], **arg_f)
     
     
     for k in range(2, len(tList)-1):
@@ -153,7 +153,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         if lambda_avant <= 0:
              return 1e5
          
-        likelihood += np.log(lambda_avant) - compensator_k
+        likelihood += np.log(lambda_avant) - compensator_k  + f(tList[k][0], tList[k][1], **arg_f)
     
 
     if lambda_k >= 0:
@@ -169,13 +169,6 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         return 1e5
 
     likelihood -= compensator_k
-
-    
-    
-        
-    likelihood_mark = list(map(lambda x: np.log(f(x[0], x[1], **arg_f)), tList[1:-1]))
-    
-    likelihood+=sum(likelihood_mark)
     
      # We return the opposite of the likelihood in order to use minimization packages.
     return -likelihood
@@ -311,7 +304,7 @@ Returns
     return -likelihood
         
     
-def loglikelihood(theta, tList):
+def loglikelihood(theta, tList, **kwargs):
     """
     Exact computation of the loglikelihood for an exponential Hawkes process for either self-exciting or self-regulating cases. 
     Estimation for a single realization.

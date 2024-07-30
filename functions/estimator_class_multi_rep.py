@@ -4,7 +4,7 @@ from functions.GOF import *
 from functions.compensator import *
 import multiprocessing
 import functools
-from functions.display_qqconf import *
+#from functions.display_qqconf import *
 
 
 class estimator_unidim_multi_rep(object):
@@ -200,7 +200,7 @@ class estimator_unidim_multi_rep(object):
 
         ## apply time transformation to all realisation 
         pool = multiprocessing.pool.ThreadPool(nb_cores)     
-        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_theta, sup_compensator=None, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.time_jump)
+        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_theta, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.time_jump)
         pool.close()
         
         ### select a subsample 
@@ -217,10 +217,10 @@ class estimator_unidim_multi_rep(object):
 
         KS_test = kstest(pval_list, cdf = 'uniform')
         
-       ## display qqconf plot of the pvalue
-        with r_inline_plot():
-            uniformity_test( robjects.FloatVector(pval_list))
-     
+         ## display qqconf plot of the pvalue
+#        with r_inline_plot():
+#            uniformity_test( robjects.FloatVector(pval_list))
+
         return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
@@ -547,8 +547,8 @@ class estimator_multidim_multi_rep(object):
 
         KS_test = kstest(results, cdf = 'uniform')
         
-        with r_inline_plot():
-            uniformity_test( robjects.FloatVector(results))
+        #with r_inline_plot():
+        #    uniformity_test( robjects.FloatVector(results))
         
         return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
