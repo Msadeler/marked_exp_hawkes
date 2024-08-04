@@ -4,7 +4,7 @@ from functions.GOF import *
 from functions.compensator import *
 import multiprocessing
 import functools
-#from functions.display_qqconf import *
+from functions.display_qqconf import *
 
 
 class estimator_unidim_multi_rep(object):
@@ -96,7 +96,7 @@ class estimator_unidim_multi_rep(object):
 
 
         else: 
-            self.bounds = [(0.0, None), (a_bound, None), (0.0, bound_b)]
+            self.bounds = [(1e-5, None), (a_bound, None), (0.0, bound_b)]
             self.initial_guess = initial_guess
             self.loss = loss
 
@@ -218,8 +218,8 @@ class estimator_unidim_multi_rep(object):
         KS_test = kstest(pval_list, cdf = 'uniform')
         
          ## display qqconf plot of the pvalue
-#        with r_inline_plot():
-#            uniformity_test( robjects.FloatVector(pval_list))
+        with r_inline_plot():
+            uniformity_test( robjects.FloatVector(pval_list))
 
         return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 

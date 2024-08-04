@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 
-def likelihood_Poisson(theta, tList):
+def likelihood_Poisson(theta, tList, **kwargs):
      
     """
     Exact computation of the loglikelihood for an Poisson Process. 
@@ -23,9 +23,13 @@ def likelihood_Poisson(theta, tList):
         The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
 
     """
-    
+    if isinstance(theta, (np.ndarray,list)):
+        mu = theta[0]  
+    elif isinstance(theta, float):
+        mu = theta  
 
-    loglik = (len(tList)-2)*np.log(theta[0]) - tList[-1]*theta[0]
+    print(mu)
+    loglik = (len(tList)-2)*np.log(mu) - (tList[-1]- tList[0])*mu
 
     return(-loglik)
 
