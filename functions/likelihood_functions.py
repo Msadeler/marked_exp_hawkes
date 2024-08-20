@@ -28,7 +28,6 @@ def likelihood_Poisson(theta, tList, **kwargs):
     elif isinstance(theta, float):
         mu = theta  
 
-    print(mu)
     loglik = (len(tList)-2)*np.log(mu) - (tList[-1]- tList[0])*mu
 
     return(-loglik)
@@ -124,7 +123,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
     """
     arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
     arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
-    theta = np.array(x[len(name_arg_f)+len(name_arg_phi):])  
+    theta = x[len(name_arg_f)+len(name_arg_phi):]
     
 
     # unpack hawkes parameters 
@@ -138,7 +137,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         lambda_avant = lambda0
         lambda_k = lambda0 + a*phi(tList[1][1],**arg_phi, **arg_f)
     
-    likelihood = np.log(lambda_avant) - compensator_k +  f(tList[1][0], tList[1][1], **arg_f)
+    likelihood = np.log(lambda_avant) - compensator_k 
     
     
     for k in range(2, len(tList)-1):
@@ -157,7 +156,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         if lambda_avant <= 0:
              return 1e5
          
-        likelihood += np.log(lambda_avant) - compensator_k  + f(tList[k][0], tList[k][1], **arg_f)
+        likelihood += np.log(lambda_avant) - compensator_k  
     
 
     if lambda_k >= 0:
@@ -174,19 +173,23 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
 
     likelihood -= compensator_k
     
+    likelihood_mark = np.sum([f(time, mark , **arg_f) for time, mark in tList[1:-1]])
+    likelihood += likelihood_mark
+    
+        
      # We return the opposite of the likelihood in order to use minimization packages.
     return -likelihood
 
 
 def minimization_unidim_unmark(list_times, loss, initial_guess, bounds, options):
-     return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
+     return(minimize(loss, x0 = initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
 
 def minimization_unidim_marked(tlist,loss, initial_guess,f,phi, name_arg_f, name_arg_phi, bounds, options):
     return(minimize(loss,x0=initial_guess, method="L-BFGS-B",args=(tlist, name_arg_f,name_arg_phi,f,phi), bounds=bounds, options=options))
 
 
-def minimization_multidim_marked(x,loss, initial_guess,f,phi, name_arg_f, name_arg_phi,bounds, options):
-    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(x,name_arg_f,name_arg_phi,f,phi), bounds=bounds, options=options))
+def minimization_multidim_marked(tlist,loss, initial_guess,f,phi, name_arg_f, name_arg_phi,bounds, options):
+    return(minimize(loss,initial_guess, method="L-BFGS-B",args=(tlist,name_arg_f,name_arg_phi,f,phi), bounds=bounds, options=options))
 
 def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, options, dim):
      return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times, dim), bounds=bounds, options=options))
