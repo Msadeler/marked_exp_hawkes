@@ -7,12 +7,15 @@ from scipy.stats import kstest
 
 
 def aggregated_process(timeslists):
+    
+    ### aggregate all process given
     aggList = [0.0]
     for times in timeslists:
         aggList += [aggList[-1] + i for i in times]
 
+    ## delete the time corresponding to Lambd(Tmax) that are not actual jump time
     end_times = np.cumsum([len(times) for times in timeslists])
-    max_obs_time = end_times[-1]
+    max_obs_time = aggList[-1]
     
     aggList = np.array([aggList[k] for k in np.arange(end_times[-1]) if k not in end_times])
     
@@ -33,6 +36,8 @@ def GOF_procedure(time_transformed_list, sup_compensator):
 
 
     selected_time = cumulated_process[cumulated_process<= sup_compensator]/sup_compensator
+    
+    #selected_time = cumulated_process[2:]- cumulated_process[1:-1]
     
     
     ### Test if pval follow an uniform law on [0,1]

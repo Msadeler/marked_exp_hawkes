@@ -4,7 +4,13 @@
 import numpy as np
 
 def poisson_compensator(tList,theta, **kwargs):
-    return([theta[0]*time for time in tList[1:]])
+    
+    if isinstance(theta, (np.ndarray,list)):
+        mu = theta[0]  
+    elif isinstance(theta, float):
+        mu = theta  
+        
+    return([mu*time for time in tList[1:]])
 
 
 def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_phi={}):

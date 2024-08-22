@@ -5,6 +5,7 @@ from functions.compensator import *
 import multiprocessing
 import functools
 from functions.display_qqconf import *
+import matplotlib.pyplot as plt
 
 
 class estimator_unidim_multi_rep(object):
@@ -159,7 +160,8 @@ class estimator_unidim_multi_rep(object):
                       SubSample_size= None, 
                       Nb_SubSample = 50,
                       nb_cores = -1, 
-                      compensator_func = unidim_EHP_compensator):
+                      compensator_func = unidim_EHP_compensator, 
+                      plot = True):
         
 
         """
@@ -218,13 +220,14 @@ class estimator_unidim_multi_rep(object):
         KS_test = kstest(pval_list, cdf = 'uniform')
         
          ## display qqconf plot of the pvalue
-        with r_inline_plot():
-            uniformity_test( robjects.FloatVector(pval_list))
+        if plot : 
+            with r_inline_plot():
+                uniformity_test( robjects.FloatVector(pval_list))
 
         return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
-    def test_one_coeff(self, index_coeff, theta_star):
+    def test_one_coeff(self, index_coeff: int, theta_star : float, plot = None):
 
 
         """
@@ -251,8 +254,9 @@ class estimator_unidim_multi_rep(object):
 
         ks_test = kstest( test_stat, cdf='norm')
         
-        with r_inline_plot():
-            normality_test( robjects.FloatVector(test_stat))
+        if plot : 
+            with r_inline_plot():
+                normality_test( robjects.FloatVector(test_stat))
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
@@ -547,8 +551,8 @@ class estimator_multidim_multi_rep(object):
 
         KS_test = kstest(results, cdf = 'uniform')
         
-        #with r_inline_plot():
-        #    uniformity_test( robjects.FloatVector(results))
+        with r_inline_plot():
+            uniformity_test( robjects.FloatVector(results))
         
         return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
