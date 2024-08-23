@@ -103,7 +103,11 @@ class estimator_unidim_multi_rep(object):
 
         
 
-    def fit(self, timestamps ,nb_cores=None):
+    def fit(self, 
+            timestamps, 
+            max_time = None, 
+            max_jump = None, 
+            nb_cores=None):
         
         """
         Fit the Unidim Hawkes model to a list of realisations
@@ -118,49 +122,61 @@ class estimator_unidim_multi_rep(object):
                
         """
         
-        
+        self.max_time = max_time
+        self.max_jump = max_jump
         self.time_jump = timestamps
-
-        if not nb_cores: 
-            nb_cores = multiprocessing.cpu_count()-1 
         
-        if not self.mark :
-            pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.time_jump)
-            pool.close()
-
-        else: 
-
-            pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.time_jump)
-            pool.close()
+        if not (max_time or max_jump):
+            print('Must specify if the last time corresponds to the last jump or the maximum observation time')
             
-
-        self.res_list = results
-            
-        self.params_estim = np.array([res.x for res in self.res_list])
-        self.mean_MLE = np.array(self.params_estim).mean(axis=0)
-        self.mean_theta = self.mean_MLE[-3:]
-        
-        if self.mark:
-            self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
-            self.mean_phi_arg = dict(zip(self.name_arg_phi,
-                                         self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
-
         else : 
-            self.mean_f_arg = {}
-            self.mean_phi_arg = {}
+            ### if max jup if not None, add another point to each time list mimicing the last time of obs 
+            if self.max_jump is not None:
+                self.timestamps_completed = list(map( lambda x : x + [x[-1]], self.time_jump))
+            else : 
+                self.timestamps_completed = self.time_jump
                     
-        self.fit = True
-        return(self.mean_MLE)
+
+            if not nb_cores: 
+                nb_cores = multiprocessing.cpu_count()-1 
+            
+            if not self.mark :
+                pool = multiprocessing.Pool(nb_cores)                         
+                results = pool.map(functools.partial(minimization_unidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options) , self.timestamps_completed)
+                pool.close()
+
+            else: 
+                pool = multiprocessing.Pool(nb_cores)                         
+                results = pool.map( functools.partial(minimization_unidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options) , self.timestamps_completed)
+                pool.close()
+                
+
+            self.res_list = results
+                
+            self.params_estim = np.array([res.x for res in self.res_list])
+            self.mean_MLE = np.array(self.params_estim).mean(axis=0)
+            self.mean_theta = self.mean_MLE[-3:]
+            
+            if self.mark:
+                self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
+                self.mean_phi_arg = dict(zip(self.name_arg_phi,
+                                            self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
+
+            else : 
+                self.mean_f_arg = {}
+                self.mean_phi_arg = {}
+                        
+            self.fit = True
+            return(self.mean_MLE)
     
 
-    def GOF_bootstrap(self, 
+    def GOF_bootstrap(self,
+                    compensator_func = unidim_EHP_compensator, 
                       sup_compensator=None,
                       SubSample_size= None, 
                       Nb_SubSample = 50,
                       nb_cores = -1, 
-                      compensator_func = unidim_EHP_compensator, 
+                      test_type = 'uniform',
                       plot = True):
         
 
@@ -202,21 +218,21 @@ class estimator_unidim_multi_rep(object):
 
         ## apply time transformation to all realisation 
         pool = multiprocessing.pool.ThreadPool(nb_cores)     
-        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_theta, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.time_jump)
+        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_theta, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.timestamps_completed)
         pool.close()
         
         ### select a subsample 
         subsample = [np.random.choice(np.arange(sample_size), size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
         subsample_times = [[time_transformed[k] for k in index] for index in subsample]
+        
         ## foor each subsample, perform gof procedure by aggegating transformed process and compute
         ## the associated pval
-        
-        
         pool = multiprocessing.pool.ThreadPool(nb_cores)     
-        pval_list = pool.map(functools.partial(GOF_procedure,sup_compensator=sup_compensator), subsample_times)
+        pval_list = pool.map(functools.partial(GOF_procedure,sup_compensator=sup_compensator, test_type = test_type), subsample_times)
         pool.close()
 
 
+        ## compare the pval distribution to a uniform one
         KS_test = kstest(pval_list, cdf = 'uniform')
         
          ## display qqconf plot of the pvalue

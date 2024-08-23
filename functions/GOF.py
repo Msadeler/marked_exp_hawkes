@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import kstest
 
 
-def aggregated_process(timeslists):
+def aggregated_process(timeslists: list):
     
     ### aggregate all process given
     aggList = [0.0]
@@ -22,7 +22,7 @@ def aggregated_process(timeslists):
     return aggList,max_obs_time
 
 
-def GOF_procedure(time_transformed_list, sup_compensator):
+def GOF_procedure(time_transformed_list: list, sup_compensator: float, test_type : str):
 
 
     ### computation of the cumulated process
@@ -34,14 +34,14 @@ def GOF_procedure(time_transformed_list, sup_compensator):
     elif sup_compensator>end_time:
         print("The chosen born is greater than the actual founded : sup_taken = {} and sup founded = {}".format(sup_compensator,end_time))
 
-
-    #selected_time = cumulated_process[cumulated_process<= sup_compensator]/sup_compensator
-    
-    selected_time = cumulated_process[2:]- cumulated_process[1:-1]
+    if test_type =='uniform':
+        selected_time = cumulated_process[cumulated_process<= sup_compensator]/sup_compensator
+    elif test_type =='expon':
+        selected_time = cumulated_process[2:]- cumulated_process[1:-1]
     
     
     ### Test if pval follow an uniform law on [0,1]
-    pval = kstest(selected_time, cdf='expon').pvalue
+    pval = kstest(selected_time, cdf=test_type).pvalue
 
 
     return(pval)

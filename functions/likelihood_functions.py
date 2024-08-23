@@ -191,7 +191,7 @@ def minimization_unidim_marked(tlist,loss, initial_guess,f,phi, name_arg_f, name
 def minimization_multidim_marked(tlist,loss, initial_guess,f,phi, name_arg_f, name_arg_phi,bounds, options):
     return(minimize(loss,initial_guess, method="L-BFGS-B",args=(tlist,name_arg_f,name_arg_phi,f,phi), bounds=bounds, options=options))
 
-def minimization_multidim_unmark(list_times, loss, initial_guess, bounds, options, dim):
+def minimization_multidim_unmark(list_times :  list, loss, initial_guess , bounds, options, dim):
      return(minimize(loss, initial_guess, method="L-BFGS-B",args=(list_times, dim), bounds=bounds, options=options))
 
 

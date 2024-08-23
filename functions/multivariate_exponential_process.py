@@ -191,13 +191,13 @@ class multivariate_exponential_hawkes_marked(object):
                 
                 self.timestamps += [(t, type_event + 1, mark)]
                 
-                ij_intensity[:, type_event] += self.a[:, type_event]*(self.phi(mark, **self.arg_phi,**self.arg_F)[:,type_event])
+                ij_intensity[:, type_event] += np.multiply(self.a[:, type_event],self.phi(mark, **self.arg_phi,**self.arg_F))
                 
                 self.intensity_jumps = np.c_[
                     self.intensity_jumps, self.m + np.sum(ij_intensity, axis=1, keepdims=True)]
 
                 auxiliary_ij = np.multiply(auxiliary_ij, np.exp(-self.b * (t - self.timestamps[-2][0])))
-                auxiliary_ij[:, type_event] += auxiliary_a[:, type_event]*(self.phi(mark, **self.arg_phi)[:,type_event])
+                auxiliary_ij[:, type_event] += np.multiply(auxiliary_a[:, type_event], self.phi(mark, **self.arg_phi, **self.arg_F))
                 auxiliary_intensity = self.m + np.sum(auxiliary_ij, axis=1, keepdims=True)
 
                 flag += 1
