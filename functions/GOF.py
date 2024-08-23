@@ -35,13 +35,13 @@ def GOF_procedure(time_transformed_list, sup_compensator):
         print("The chosen born is greater than the actual founded : sup_taken = {} and sup founded = {}".format(sup_compensator,end_time))
 
 
-    selected_time = cumulated_process[cumulated_process<= sup_compensator]/sup_compensator
+    #selected_time = cumulated_process[cumulated_process<= sup_compensator]/sup_compensator
     
-    #selected_time = cumulated_process[2:]- cumulated_process[1:-1]
+    selected_time = cumulated_process[2:]- cumulated_process[1:-1]
     
     
     ### Test if pval follow an uniform law on [0,1]
-    pval = kstest(selected_time, cdf='uniform').pvalue
+    pval = kstest(selected_time, cdf='expon').pvalue
 
 
     return(pval)
