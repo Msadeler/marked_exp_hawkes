@@ -105,7 +105,7 @@ class estimator_unidim_multi_rep(object):
 
     def fit(self, 
             timestamps, 
-            max_time = None, 
+            max_time = True, 
             max_jump = None, 
             nb_cores=None):
         
@@ -116,9 +116,12 @@ class estimator_unidim_multi_rep(object):
         ----------
         timestamps : list containing lists of tuples 
             List of ordered list containing event times, component and mark value.
-
         nb_cores : int or None
             Number of core to use during the estimation
+        max_jump : bool or None, default value is None
+            Wheter the last point of data given contains the last obsavable jump of the process
+        max_time : bool or None, default value is None
+            Wheter the last point of data given contains the last time forr wich the process was observed
                
         """
         
@@ -188,8 +191,7 @@ class estimator_unidim_multi_rep(object):
         ----------
 
         sup_compensator : float or None, default value is None
-            Parameter that is, a.s, less than the mean size of the interval of realisation of the cumulated process. If not value is given, sup_compensator is equal to 0.9 times the sum of the values Lambdai(Tmax)
-
+            Parameter that is, a.s, less than the mean size of the interval of realisation of the cumulated process. If no value is given, sup_compensator is equal to 0.9 times the sum of the values Lambdai(Tmax) on the data given
           
         SubSample_size : int or None
             Size of the subsamples used to perform the procedure. If None, SubSample_size set to n**(2/3) with n the number of realisation available.
@@ -254,10 +256,13 @@ class estimator_unidim_multi_rep(object):
         ----------
 
         index : int
-            Index of the paramter, inside the list self.param_theta, that is tested. index = 0 for mu, index = 1 for a, index = 2 b and index = 4 for arg_phi
+            Index of the paramter, inside the list self.param_theta, that is tested.
           
         theta_star : float
             Value of the true parameter to test
+            
+        plot : Bool
+            Wheter to plot the qqconf graph associated. 
         
         """
 
@@ -452,7 +457,11 @@ class estimator_multidim_multi_rep(object):
             
         self.fitted = False
             
-    def fit(self, timestamps , markList=[], nb_cores=None):
+    def fit(self, 
+            timestamps, 
+            max_time = True, 
+            max_jump = None, 
+            nb_cores=None):
         
         """
         Fit the Unidim Hawkes model to a list of realisations
@@ -474,21 +483,30 @@ class estimator_multidim_multi_rep(object):
         
         self.time_jump = timestamps
 
+        if not (max_time or max_jump):
+                    print('Must specify if the last time corresponds to the last jump or the maximum observation time')
+                
+        else : 
+            ### if max jup if not None, add another point to each time list mimicing the last time of obs 
+            if self.max_jump is not None:
+                self.timestamps_completed = list(map( lambda x : x + [x[-1]], self.time_jump))
+            else : 
+                self.timestamps_completed = self.time_jump
+                    
+
         if not nb_cores: 
             nb_cores = multiprocessing.cpu_count()-1 
         
         if not self.mark :
             
-            self.mark_list = timestamps
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map(functools.partial(minimization_multidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options, dim = self.dim) , self.time_jump)
+            results = pool.map(functools.partial(minimization_multidim_unmark,loss=self.loss, initial_guess=self.initial_guess, bounds=self.bounds, options=self.options, dim = self.dim) , self.timestamps_completed)
             pool.close()
 
         else: 
 
-            self.mark_list = markList
             pool = multiprocessing.Pool(nb_cores)                         
-            results = pool.map( functools.partial(minimization_multidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options, dim = self.dim) , self.time_jump, self.mark_list)
+            results = pool.map( functools.partial(minimization_multidim_marked,loss=self.loss, initial_guess=self.initial_guess,name_arg_f=self.name_arg_f,name_arg_phi=self.name_arg_phi,f=self.f, phi=self.phi,bounds=self.bounds,options=self.options, dim = self.dim) , self.timestamps_completed)
             pool.close()
             
 
@@ -503,13 +521,15 @@ class estimator_multidim_multi_rep(object):
         if self.mark:
             self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
             self.mean_phi_arg = dict(zip(self.name_arg_phi,
-                                         self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
+                                        self.mean_MLE[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
 
         else : 
             self.mean_f_arg = {}
             self.mean_phi_arg = {}
                     
         self.fit = True
+        
+        
         return(self.mean_MLE)
     
 
