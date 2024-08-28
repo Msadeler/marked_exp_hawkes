@@ -142,7 +142,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
     
     for k in range(2, len(tList)-1):
         
-        if lambda_k >= 0:
+        if lambda_k >= 0:            
             C_k = lambda_k - lambda0
             tau_star = tList[k][0] - tList[k - 1][0]
         else:
