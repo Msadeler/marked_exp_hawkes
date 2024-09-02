@@ -1,6 +1,5 @@
 import rpy2.robjects as robjects
 from contextlib import contextmanager
-from contextlib import contextmanager
 from rpy2.robjects.lib import grdevices
 from IPython.display import Image, display
 from rpy2 import robjects
@@ -8,6 +7,7 @@ from rpy2.robjects.packages import importr
 
 rqqconf = importr('qqconf')
 rstats = importr('stats')
+
 robjects.r('''
            uniformity_test <- function(pvals, alpha = 0.05, min = 0, max = 1)
            {

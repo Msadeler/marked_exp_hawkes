@@ -60,10 +60,21 @@ hawkes_multi.plot_intensity(ax = ax)
 
 ```py 
 
-estimator = multivariate_estimator()
+estimator = multivariate_estimator(dimension = 2, 
+                                    mark = False,
+                                    options=None, 
+                                    a_bound = None, 
+                                    beta_bound = None,
+                                    interaction_coeff = None)
+estimator.fit(timestamps)
 
 ```
 
 ## Examples 
 
-Complete usage examples are available in the examples folder, with scripts illustrating simulation, estimation, and testing of a unidimensional or multidimensional marked Hawkes process.
+Complete usage examples are available in the examples folder, with scripts illustrating simulation, estimation, and testing of a unidimensional or multidimensional marked Hawkes process, when either on or more repetitions of the process are available.
+
+
+## Dependencies
+
+This code was implemented using Python 3.12.4 and needs Numpy, Matplotlib, Scipy, rpy2, IPython, functools, multiprocessing, .
