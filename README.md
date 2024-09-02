@@ -11,6 +11,8 @@ We present two class, allowing for simulation and estimation of a marked hawkes 
 
 from functions.multivariate_exponential_process import *
 import scipy 
+from function_test import *
+
 
 if __name__ == "__main__":
 
@@ -25,17 +27,6 @@ if __name__ == "__main__":
 
     Tmax = 10
     phi_arg = 0.5
-
-
-
-    def F(mark,time,psi):
-        return(scipy.stats.expon.cdf(mark, scale = psi))
-
-    def phi(mark, gamma, psi):
-        return((psi-gamma)/psi*np.exp(mark*gamma))
-
-    def f(mark,t, psi):
-        return(psi*np.exp(-psi*mark))
         
     hawkes_multi = multivariate_exponential_hawkes_marked(m=m,
                                                       a=a, 
@@ -52,3 +43,5 @@ if __name__ == "__main__":
     hawkes_multi.plot_intensity(ax = ax)   
 
 ```
+<img src="./plot/simulation_MMEHP.png" width="500">
+
