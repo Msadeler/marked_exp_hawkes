@@ -13,15 +13,15 @@ This project provides a Python implementation for simulating and estimating a un
 - **Likelihood Calculation Functions:** Different functions such as ``multivariate_marked_likelihood``, ``loglikelihoodMarkedHawkes``,``multivariate_loglikelihood_simplified`` or ``loglikelihood``, allow to cumpute the likelihood of a parameter in different Hawkes model, given a set of data.
 - **Parameter Estimation:** Two class allows to compute the parameter of either a multidimensional or unidimensional Hawkes process when one or more repetition of the process are available: ``estimator_unidim_multi_rep``, ``estimator_multidim_multi_rep``, ``loglikelihood_estimator`` and ``multivariate_estimator` . All of them require the user so specify the model characteristic, such as the type of parametrisation chosen for the impact function and the density of the mark, the associated name of paramter and the space they are embedded in.   
 
-### 3. Testing Procedures for Model Fit
-- **Testing a Specific Coefficient Value:** This procedure allows testing whether a given coefficient in the model equals a specific predefined value.
-- **Testing Coefficient Equality:** This procedure allows testing whether two or more coefficients in the model are equal.
-- **Goodness-of-Fit (GOF) Tests:** These tests check whether the observed data is consistent with a Hawkes process, such as evaluating the uniform distribution of aggregated points or the exponential distribution of process increments.
+### 3. Testing Procedures
+- **Testing a Specific Coefficient Value:** This procedure, associated to the estimator class with several repetition available, allows testing whether a given coefficient in the model equals a specific predefined value.
+- **Testing Coefficient Equality:** This procedure, associated to the estimator class with several repetition available, allows testing whether two coefficients in the model are equals.
+- **Goodness-of-Fit (GOF) Tests:** This procedure, associated to the estimator class with several repetition available, allows testing the model fit on the data by.
 
 
 ## Usage 
 
-``py
+```py
 from functions.multivariate_exponential_process import *
 from functions.paramtrised_function import *
 import scipy 
@@ -49,5 +49,5 @@ hawkes_multi.simulate()
 
 fig,ax = plt.subplots(2,2, figsize = (10,10))
 hawkes_multi.plot_intensity(ax = ax)
-``
+```
 <img src="./plot/simulation_MMEHP.png" width="500">
