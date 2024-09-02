@@ -100,7 +100,7 @@ class estimator_unidim_daichan(object):
     
     
       
-class loglikelihood_estimator_bfgs(object):
+class loglikelihood_estimator(object):
     """
     Estimator class for Exponential Hawkes process obtained through minimizaton of a loss using the L-BFGS-B algorithm.
 
@@ -344,7 +344,7 @@ class loglikelihood_estimator_bfgs(object):
             
     
 
-class multivariate_estimator_bfgs(object):
+class multivariate_estimator(object):
     """
     Estimator class for Exponential Hawkes process obtained through minimizaton of a loss using the L-BFGS-B algorithm.
 
@@ -355,7 +355,7 @@ class multivariate_estimator_bfgs(object):
     """
 
     def __init__(self,
-                 loss=multivariate_loglikelihood_simplified, 
+                 loss=multivariate_loglikelihood, 
                  dimension=None, 
                  initial_guess="random",
                  options=None, 

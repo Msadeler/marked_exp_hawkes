@@ -389,7 +389,7 @@ def loglikelihood(theta, tList, **kwargs):
         return (-likelihood)
 
 
-def multivariate_loglikelihood_simplified(theta, tList, dim=None, dimensional=False):
+def multivariate_loglikelihood(theta, tList, dim=None, dimensional=False):
     """
 
     Parameters

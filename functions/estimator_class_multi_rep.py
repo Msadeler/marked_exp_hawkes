@@ -316,7 +316,7 @@ class estimator_unidim_multi_rep(object):
 class estimator_multidim_multi_rep(object):
     
     def __init__(self,
-                 loss=multivariate_loglikelihood_simplified, 
+                 loss=multivariate_loglikelihood, 
                  dimension=None, 
                  initial_guess="random",
                  options=None, 
