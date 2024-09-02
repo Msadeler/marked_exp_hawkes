@@ -21,6 +21,8 @@ This project provides a Python implementation for simulating and estimating a un
 
 ## Usage 
 
+### Simulation
+
 ```py
 from functions.multivariate_exponential_process import *
 from functions.paramtrised_function import *
@@ -46,8 +48,22 @@ hawkes_multi = multivariate_exponential_hawkes_marked(m=m,
                                                       max_jumps  = 10)
 
 hawkes_multi.simulate()
-
+timestamps = hawkes_multi.timestamps
 fig,ax = plt.subplots(2,2, figsize = (10,10))
 hawkes_multi.plot_intensity(ax = ax)
 ```
 <img src="./plot/simulation_MMEHP.png" width="500">
+
+
+
+### Estimation
+
+```py 
+
+estimator = multivariate_estimator()
+
+```
+
+## Examples 
+
+Complete usage examples are available in the examples folder, with scripts illustrating simulation, estimation, and testing of a unidimensional or multidimensional marked Hawkes process.
