@@ -245,7 +245,7 @@ class estimator_unidim_multi_rep(object):
         return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
 
         
-    def test_one_coeff(self, index_coeff: int, theta_star : float, plot = None):
+    def test_one_coeff(self, coefficient_index: int, value : float, plot = None):
 
 
         """
@@ -255,10 +255,10 @@ class estimator_unidim_multi_rep(object):
         Parameters
         ----------
 
-        index : int
+        coefficient_index : int
             Index of the paramter, inside the list self.param_theta, that is tested.
           
-        theta_star : float
+        value : float
             Value of the true parameter to test
             
         plot : Bool
@@ -266,12 +266,12 @@ class estimator_unidim_multi_rep(object):
         
         """
 
-        if (self.mark or theta_star<=0):
+        if (self.mark or value<=0):
             print("No theoretical garantee associated to this test")
             
-        coeff = self.params_estim[:,index_coeff]
+        coeff = self.params_estim[:,coefficient_index]
         
-        test_stat = (coeff-theta_star)/np.std(coeff)
+        test_stat = (coeff-value)/np.std(coeff)
 
         ks_test = kstest( test_stat, cdf='norm')
         
@@ -281,7 +281,7 @@ class estimator_unidim_multi_rep(object):
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
-    def test_equality_coeff(self, index_1, index_2):
+    def test_equality_coeff(self, coefficient_index_1, coefficient_index_2):
 
 
         """
@@ -291,7 +291,7 @@ class estimator_unidim_multi_rep(object):
         Parameters
         ----------
 
-        index_1, index_2 : int
+        coefficient_index_1, coefficient_index_2 : int
             Indexes of the paramters, inside the list self.param_theta, whose equality is tested. 
         
         """
@@ -299,8 +299,8 @@ class estimator_unidim_multi_rep(object):
         if (self.mark) :
             print("No theoretical garantee associated to this test")
 
-        cov_mat = np.cov(self.params_estim[:,index_1], self.params_estim[:,index_2]) 
-        stat = (self.params_estim[:,index_1] - self.params_estim[:,index_2])/ np.sqrt( cov_mat[0,0]+ cov_mat[1,1]-2*cov_mat[0,1]  )
+        cov_mat = np.cov(self.params_estim[:,coefficient_index_1], self.params_estim[:,coefficient_index_2]) 
+        stat = (self.params_estim[:,coefficient_index_1] - self.params_estim[:,coefficient_index_2])/ np.sqrt( cov_mat[0,0]+ cov_mat[1,1]-2*cov_mat[0,1]  )
         ks_test = kstest( stat, cdf='norm')
         
         

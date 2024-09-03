@@ -77,4 +77,4 @@ Complete usage examples are available in the examples folder, with scripts illus
 
 ## Dependencies
 
-This code was implemented using Python 3.12.4 and needs Numpy, Matplotlib, Scipy, rpy2, IPython, functools, multiprocessing, .
+This code was implemented using Python 3.12.4 and needs Numpy, Matplotlib, Scipy, rpy2, IPython, functools, multiprocessing.

@@ -546,5 +546,220 @@ class exp_thinning_hawkes_marked(object):
                 ax2.legend()
                 ax2.grid()
 
+class exp_thinning_hawkes_multi_marked(object):
+    def __init__(self,
+                 m,
+                 a,
+                 b, 
+                 n=1,
+                 t=0.0, 
+                 max_jumps=None, 
+                 max_time=None, 
+                 phi = lambda x: 1, 
+                 F = lambda x,t: 1,
+                 arg_phi = {}, 
+                 arg_F = {}):
+        
+        
+        """
+        Parameters
+        ----------
+        m : float
+            Baseline constant intensity.
+        a : float
+            Interaction factor.
+        b : float
+            Decay factor.
+        n : int
+            number of i.i.d repetition to generate
+        t : float, optional
+            Initial time. The default is 0.
+        max_jumps : float, optional
+            Maximal number of jumps. The default is None.
+        max_time : float, optional
+            Maximal time horizon. The default is None.
+            
+        phi: function
+            Impact function of the mark on the process
+        
+        F: function
+            Cumulative distribution function of the mark
+            
+        arg_phi: dictionnary
+            Argument use, other than mark, for the function F
+            
+        arg_F: dictionnary
+            Argument use, other than mark and time, for the function F
+            
+        Attributes
+        ----------
+        t_0 : float
+            Initial time provided at initialization.
+        timestamps : list of float
+            List of simulated events. It includes the initial time t_0.
+        intensity_jumps : list of float
+            List of intensity at each simulated jump. It includes the baseline intensity m.
+        aux : float
+            Parameter used in simulation.
+        simulated : bool
+            Parameter that marks if a process has been already been simulated, or if its event times have been initialized.
+        """
+        self.a = a
+        self.b = b
+        self.t_0 = t
+        self.t = t
+        self.m = m
+        self.max_jumps = max_jumps
+        self.max_time = max_time
+        self.timestamps = [t]
+        self.mark = 0 
+        self.mark_list = [0]
+        self.intensity_jumps = [m]
+        self.aux = 0
+        self.simulated = False
+        self.F = F
+        self.phi = phi
+        self.arg_F = arg_F
+        self.arg_phi = arg_phi 
+        self.nb_iter = n
+        
+    def simulate(self):
+        """
+        Auxiliary function to check if already simulated and, if not, which simulation to launch.
 
+        Simulation follows Ogata's adapted thinning algorithm.
+
+        Works with both self-exciting and self-regulating processes.
+        
+        To launch simulation either self.max_jumps or self.max_time must be other than None, so the algorithm knows when to stop.
+        """
+        if not self.simulated:
+            if self.max_jumps is not None and self.max_time is None:
+                self.simulate_jumps()
+            elif self.max_time is not None and self.max_jumps is None:
+                self.simulate_time()
+            else:
+                print("Either max_jumps or max_time must be given.")
+            self.simulated = True
+
+        else:
+            print("Process already simulated")
+
+    def simulate_jumps_onces(self):
+        """
+        Simulation is done until the maximal number of jumps (self.max_jumps) is attained.
+        """
+        flag = 0
+
+        candidate_intensity = self.m
+
+        while flag < self.max_jumps:
+
+            upper_intensity = max(self.m, candidate_intensity)
+
+            self.t += np.random.exponential(1 / upper_intensity)
+            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)
+            
+            candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1]))
+
+            if upper_intensity * np.random.uniform() <= candidate_intensity:
+                
+                self.timestamps += [self.t]
+                self.mark_list +=[self.mark]
+                self.intensity_jumps += [candidate_intensity + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)]
+                self.aux = candidate_intensity - self.m + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)
+                flag += 1
+
+        self.max_time = self.timestamps[-1]
+        
+    def simulate_time_onces(self):
+        """
+        Simulation is done until an event that surpasses the time horizon (self.max_time) appears.
+        """
+        flag = self.t < self.max_time
+
+        while flag:
+            upper_intensity = max(self.m,
+                                  self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1])))
+
+            self.t += np.random.exponential(1 / upper_intensity)
+            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)            
+            candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1]))
+
+            flag = self.t < self.max_time
+
+            if upper_intensity * np.random.uniform() <= candidate_intensity and flag:
+                self.timestamps += [self.t]
+                self.mark_list +=[self.mark]
+                self.intensity_jumps += [candidate_intensity + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)]
+
+                self.aux = self.aux * np.exp(-self.b * (self.t - self.timestamps[-2])) + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)
+
+        self.timestamps += [self.max_time]
+
+        
+    def simulate_jumps(self):
+        """
+        Simulation is done until the maximal number of jumps (self.max_jumps) is attained.
+        """
+        flag = 0
+
+        candidate_intensity = self.m
+
+        while flag < self.max_jumps:
+
+            upper_intensity = max(self.m, candidate_intensity)
+
+            self.t += np.random.exponential(1 / upper_intensity)
+            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)
+            
+            candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1]))
+
+            if upper_intensity * np.random.uniform() <= candidate_intensity:
+                
+                self.timestamps += [self.t]
+                self.mark_list +=[self.mark]
+                self.intensity_jumps += [candidate_intensity + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)]
+                self.aux = candidate_intensity - self.m + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)
+                flag += 1
+
+        self.max_time = self.timestamps[-1]
+
+        
+    def simulate_time(self):
+        """
+        Simulation of n sample of the process
+        """
+        
+        self.timeList = []
+
+        for k in range(self.nb_iter):
+            self.simulate_time_onces()
+            self.timeList+=[self.timestamps]
+            self.timestamps = [self.t_0]
+            self.t = self.t_0
+
+
+    def simulate_jump(self):
+        """
+        Simulation of n sample of the process
+        """
+        self.timeList = []
+
+        for k in range(self.nb_iter):
+            self.simulate_jumps_onces()
+            self.timeList+=[self.timestamps]
+            self.timestamps = [self.t_0]
+            self.t = self.t_0
+            
+            
+            
+            
+
+
+        
+        
+    
+  
+    
 
