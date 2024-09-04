@@ -501,8 +501,8 @@ class exp_thinning_hawkes_marked(object):
                 else:
                     return "ax must be an instance of an axes"
 
-            if self.max_time is None:  
-                self.timestamps.append(self.max_time)
+            if self.max_jumps is not None:  
+                self.timestamps.append(self.timestamps[-1])
             
             if not self.mark_process:
                 self.timestamps = [(time,1) for time in self.timestamps]
@@ -510,8 +510,11 @@ class exp_thinning_hawkes_marked(object):
             times = np.array([self.timestamps[0][0], self.timestamps[1][0]])
             intensities = np.array([self.m, self.m])
             
+            
             step = 0.01
             for i, lambda_k in enumerate(self.intensity_jumps):
+                
+
                 if i != 0:
                     T_k = self.timestamps[i][0]
                     nb_step = np.maximum(100, np.floor((self.timestamps[i + 1][0] - T_k) / step))
@@ -534,7 +537,6 @@ class exp_thinning_hawkes_marked(object):
                 ax2.grid()
                 
             if not self.mark:
-                print('timestamps')
                 self.timestamps = [time for time, mark in self.timestamps]
 
             if self.max_jumps is not None :            
@@ -705,7 +707,7 @@ class exp_thinning_hawkes_multi_marked(object):
             self.simulate_time_onces()
             
             if not self.mark_process:
-                self.timeList+=[time for time,mark in self.timestamps]
+                self.timeList+=[[time for time,mark in self.timestamps]]
             else :
                 self.timeList+=[self.timestamps]
             
@@ -724,7 +726,7 @@ class exp_thinning_hawkes_multi_marked(object):
             self.simulate_jumps_onces()
             
             if not self.mark_process:
-                self.timeList+=[time for time,mark in self.timestamps]
+                self.timeList+=[[time for time,mark in self.timestamps]]
             else :
                 self.timeList+=[self.timestamps]
             

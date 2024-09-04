@@ -60,11 +60,12 @@ hawkes_multi.plot_intensity(ax = ax)
 
 ```py 
 
+
 estimator = multivariate_estimator(dimension = 2, 
                                     mark = False,
                                     options=None, 
                                     a_bound = None, 
-                                    beta_bound = None,
+                                    bound_b = None,
                                     interaction_coeff = None)
 estimator.fit(timestamps)
 
