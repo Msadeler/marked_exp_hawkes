@@ -501,7 +501,8 @@ class exp_thinning_hawkes_marked(object):
                 else:
                     return "ax must be an instance of an axes"
 
-            self.timestamps.append(self.max_time)
+            if self.max_time is None:  
+                self.timestamps.append(self.max_time)
             
             if not self.mark_process:
                 self.timestamps = [(time,1) for time in self.timestamps]
@@ -549,7 +550,7 @@ class exp_thinning_hawkes_multi_marked(object):
                  b, 
                  n=1,
                  t=0.0, 
-                 mark = False, 
+                 mark_process = False, 
                  max_jumps=None, 
                  max_time=None, 
                  phi = lambda x: 1, 
@@ -618,6 +619,7 @@ class exp_thinning_hawkes_multi_marked(object):
         self.arg_F = arg_F
         self.arg_phi = arg_phi 
         self.nb_iter = n
+        self.mark_process = mark_process
         
     def simulate(self):
         """
@@ -640,6 +642,7 @@ class exp_thinning_hawkes_multi_marked(object):
 
         else:
             print("Process already simulated")
+
 
     def simulate_jumps_onces(self):
         """
@@ -665,12 +668,7 @@ class exp_thinning_hawkes_multi_marked(object):
                 self.aux = candidate_intensity - self.m + self.a*self.phi(self.timestamps[-1][1], **self.arg_phi, **self.arg_F)
                 flag += 1
 
-        self.max_time = self.timestamps[-1]  
-        
-        if not self.mark : 
-            self.timestamps = [time for time, mark in self.timestamps]
-            self.max_time = self.max_time[0]    
-          
+        self.max_time = self.timestamps[-1]
 
     def simulate_time_onces(self):
         """
@@ -683,7 +681,7 @@ class exp_thinning_hawkes_multi_marked(object):
                                   self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0])))
 
             self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)            
+            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F) 
             candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0]))
 
             flag = self.t < self.max_time
@@ -693,39 +691,8 @@ class exp_thinning_hawkes_multi_marked(object):
                 self.intensity_jumps += [candidate_intensity + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)]
                 self.aux = self.aux * np.exp(-self.b * (self.t - self.timestamps[-2][0])) + self.a*self.phi(self.timestamps[-1][1], **self.arg_phi, **self.arg_F)
 
-        self.timestamps += [self.max_time] 
-        
-        if not self.mark : 
-            self.timestamps = [time for time, mark in self.timestamps]
-        
-        
-           
-    def simulate_jumps(self):
-        """
-        Simulation is done until the maximal number of jumps (self.max_jumps) is attained.
-        """
-        flag = 0
-
-        candidate_intensity = self.m
-
-        while flag < self.max_jumps:
-
-            upper_intensity = max(self.m, candidate_intensity)
-
-            self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)
-            
-            candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1]))
-
-            if upper_intensity * np.random.uniform() <= candidate_intensity:
-                
-                self.timestamps += [(self.t, self.mark)]
-                self.intensity_jumps += [candidate_intensity + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)]
-                self.aux = candidate_intensity - self.m + self.a*self.phi(self.mark, **self.arg_phi, **self.arg_F)
-                flag += 1
-
-        self.max_time = self.timestamps[-1]
-
+        self.timestamps += [(self.max_time,0)]
+              
         
     def simulate_time(self):
         """
@@ -736,8 +703,13 @@ class exp_thinning_hawkes_multi_marked(object):
 
         for k in range(self.nb_iter):
             self.simulate_time_onces()
-            self.timeList+=[self.timestamps]
-            self.timestamps = [(self.t_0, 0)]
+            
+            if not self.mark_process:
+                self.timeList+=[time for time,mark in self.timestamps]
+            else :
+                self.timeList+=[self.timestamps]
+            
+            self.timestamps = [self.timestamps[0]]
             self.t = self.t_0
 
 
@@ -750,8 +722,12 @@ class exp_thinning_hawkes_multi_marked(object):
 
         for k in range(self.nb_iter):
             self.simulate_jumps_onces()
-            self.timeList+=[self.timestamps]
-            self.timestamps = [(self.t_0,0)]
+            if not self.mark_process:
+                self.timeList+=[time for time,mark in self.timestamps]
+            else :
+                self.timeList+=[self.timestamps]
+            
+            self.timestamps = [self.timestamps[0]]
             self.t = self.t_0
 
             
