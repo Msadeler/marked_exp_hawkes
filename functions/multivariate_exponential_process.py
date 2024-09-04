@@ -576,3 +576,238 @@ class multivariate_exponential_hawkes(object):
 
         ax = sns.heatmap(heat_matrix, cmap=get_continuous_cmap(hex_list), center=0, ax=ax, annot=True)
 
+
+
+
+
+class multivariate_exponential_hawkes_marked_multi(object):
+    """
+    Multivariate Hawkes process with exponential kernel.
+    No events nor initial conditions considered.
+    Mark don't depend on the component that jump and are iid
+    """
+
+    def __init__(self, 
+                 m, 
+                 a, 
+                 b,
+                 n = 1,
+                 t_0=0,
+                 mark_process = False,
+                 phi = lambda x: 1, 
+                 F = lambda x,t: 1,
+                 arg_phi = {}, 
+                 arg_F = {},
+                 max_jumps=None, 
+                 max_time=None):
+        """
+
+        Parameters
+        ----------
+        m : array_like
+            Baseline intensity vector. m.shape[0] must coincide with shapes for a and b.
+        a : array_like
+            Interaction factors matrix. Must be a square array with a.shape[0] coinciding with mu and b.
+        b : array_like
+            Decay factor matrix. Must be either an array. When corresponding to decay for each process i, it must
+            be of shape (number_of_process, 1), or a square array. b.shape[0] must coincide with mu and a.
+        max_jumps : float, optional
+            Maximal number of jumps. The default is None.
+        max_time : float, optional
+            Maximal time horizon. The default is None.
+
+        Attributes
+        ----------
+        nb_processes : int
+            Number of dimensions.
+        timestamps : list of tuple (float, int)
+            List of simulated events and their marks.
+        intensity_jumps : array of float
+            Array containing all intensities at each jump. It includes the baseline intensities mu.
+        simulated : bool
+            Parameter that marks if a process has been already been simulated,
+            or if its event times have been initialized.
+
+        """
+
+
+       
+        self.m = m.reshape((a.shape[0], 1))
+        self.a = a
+        self.b = b
+        self.max_jumps = max_jumps
+        self.max_time = max_time
+        self.F = F
+        self.phi = phi
+        self.arg_F  =arg_F
+        self.arg_phi= arg_phi
+        self.mark_process = mark_process
+        self.nb_processes = self.m.shape[0]
+        self.count = np.zeros(self.nb_processes, dtype=int)
+        self.t_0 = t_0
+        self.timestamps = [(0.0, 0, 0)]
+        self.intensity_jumps = np.copy(m)
+        self.nb_iter = n
+        self.simulated = False
+
+    def simulate(self):
+        """
+        Auxiliary function to check if already simulated and, if not, which simulation to launch.
+
+        Simulation follows Ogata's adapted thinning algorithm. Upper bound obtained by the positive-part process.
+
+        Works with both self-exciting and self-regulating processes.
+
+        To launch simulation either self.max_jumps or self.max_time must be other than None, so the algorithm knows when to stop.
+        """
+        if not self.simulated:
+            if self.max_jumps is not None and self.max_time is None:
+                self.simulate_jumps()
+            elif self.max_time is not None and self.max_jumps is None:
+                self.simulate_time()
+            else:
+                print("Either max_jumps or max_time must be given.")
+            self.simulated = True
+
+        else:
+            print("Process already simulated")
+            
+    def simulate_time_onces(self):
+     """
+     Simulation is done for a window [0, T] (T = self.max_time) is attained.
+     """
+     t = self.t_0
+     flag = t < self.max_time
+
+     auxiliary_a = np.where(self.a > 0, self.a, 0)
+     auxiliary_ij = np.zeros((self.nb_processes, self.nb_processes))
+     auxiliary_intensity = np.copy(self.m)
+
+     ij_intensity = np.zeros((self.nb_processes, self.nb_processes))
+
+     while flag:
+
+         upper_intensity = np.sum(auxiliary_intensity)
+
+         previous_t = t
+         t += np.random.exponential(1 / upper_intensity)
+         mark = self.F(np.random.uniform(),t , **self.arg_F)
+         
+         ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - previous_t)))
+         
+         
+         candidate_intensities = self.m + np.sum(ij_intensity, axis=1, keepdims=True)
+         
+         pos_candidate = np.maximum(candidate_intensities, 0) / upper_intensity
+         type_event = np.random.multinomial(1,
+                                            np.concatenate((pos_candidate.squeeze(), np.array([0.0])))).argmax()
+         flag = t < self.max_time
+         
+         if type_event < self.nb_processes and flag:
+             
+             self.timestamps += [(t, type_event + 1, mark)]
+             ij_intensity[:, type_event] += self.a[:, type_event]*self.phi(mark, **self.arg_phi, **self.arg_F)
+             self.intensity_jumps = np.c_[
+                 self.intensity_jumps, self.m + np.sum(ij_intensity, axis=1, keepdims=True)]
+
+             auxiliary_ij = np.multiply(auxiliary_ij, np.exp(-self.b * (t - self.timestamps[-2][0])))
+             auxiliary_ij[:, type_event] += auxiliary_a[:, type_event]*self.phi(mark, **self.arg_phi,**self.arg_F)
+             auxiliary_intensity = self.m + np.sum(auxiliary_ij, axis=1, keepdims=True)
+
+             self.count[type_event] += 1
+
+     self.timestamps += [(self.max_time, 0, 0)]
+     self.simulated = True
+     
+
+
+    def simulate_jumps_onces(self):
+        """
+        Simulation is done until the maximal number of jumps (self.max_jumps) is attained.
+        """
+        flag = 0
+        t = self.t_0
+
+
+        auxiliary_a = np.where(self.a > 0, self.a, 0)
+        auxiliary_ij = np.zeros((self.nb_processes, self.nb_processes))
+        auxiliary_intensity = np.copy(self.m)
+
+        ij_intensity = np.zeros((self.nb_processes, self.nb_processes))
+
+        while flag < self.max_jumps:
+            upper_intensity = np.sum(auxiliary_intensity)
+
+            previous_t = t
+            t += np.random.exponential(1 / upper_intensity)
+            mark = self.F(np.random.uniform(),t , **self.arg_F)
+
+
+            # ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - self.timestamps[-1][0])))
+            
+            ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - previous_t)))
+            
+            candidate_intensities = self.m + np.sum(ij_intensity, axis=1, keepdims=True)
+            pos_candidate = np.maximum(candidate_intensities, 0) / upper_intensity
+            type_event = np.random.multinomial(1, np.concatenate((pos_candidate.squeeze(), np.array([0.0])))).argmax()
+            
+            if type_event < self.nb_processes:
+                
+                self.timestamps += [(t, type_event + 1, mark)]
+                
+                ij_intensity[:, type_event] += np.multiply(self.a[:, type_event],self.phi(mark, **self.arg_phi,**self.arg_F))
+                
+                self.intensity_jumps = np.c_[
+                    self.intensity_jumps, self.m + np.sum(ij_intensity, axis=1, keepdims=True)]
+
+                auxiliary_ij = np.multiply(auxiliary_ij, np.exp(-self.b * (t - self.timestamps[-2][0])))
+                auxiliary_ij[:, type_event] += np.multiply(auxiliary_a[:, type_event], self.phi(mark, **self.arg_phi, **self.arg_F))
+                auxiliary_intensity = self.m + np.sum(auxiliary_ij, axis=1, keepdims=True)
+
+                flag += 1
+
+                self.count[type_event] += 1
+
+        self.max_time = self.timestamps[-1][0]
+        # Important to add the max_time for plotting and being consistent.
+        self.timestamps += [(self.max_time, 0,0)]
+        self.simulated = True
+
+
+    def simulate_time(self):
+        """
+        Simulation of n sample of the process
+        """
+        
+        self.timeList = []
+
+        for k in range(self.nb_iter):
+            self.simulate_time_onces()
+
+            if not self.mark_process:
+                self.timeList+=[(time, dim) for time,dim,mark in self.timestamps]
+            else :
+                self.timeList+=[self.timestamps]
+            
+            self.timestamps = [self.timestamps[0]]
+            self.t = self.t_0
+
+
+
+    def simulate_jumps(self):
+        """
+        Simulation of n sample of the process
+        """
+        self.timeList = []
+
+        for k in range(self.nb_iter):
+            self.simulate_jumps_onces()
+            print(self.timestamps)
+            
+            if not self.mark_process:
+                self.timeList+=[(time, dim) for time,dim,mark in self.timestamps]
+            else :
+                self.timeList+=[self.timestamps]
+            
+            self.timestamps = [self.timestamps[0]]
+            self.t = self.t_0

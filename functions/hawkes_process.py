@@ -722,6 +722,7 @@ class exp_thinning_hawkes_multi_marked(object):
 
         for k in range(self.nb_iter):
             self.simulate_jumps_onces()
+            
             if not self.mark_process:
                 self.timeList+=[time for time,mark in self.timestamps]
             else :
