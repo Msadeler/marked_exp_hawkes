@@ -34,7 +34,6 @@ np.rando.seed(0)
 # Define model parameters
 
 m, a, b = 1, -1, 2
-Tmax = 5
 
 # Simulate the process
 
@@ -43,7 +42,7 @@ hawkes_multi = multivariate_exponential_hawkes_marked(m=m,
                                                       b=b, 
                                                       phi = phi, 
                                                       F= F, 
-                                                      arg_phi={'gamma':phi_arg}, 
+                                                      arg_phi={'gamma':phi_a1rg}, 
                                                       arg_F={'psi': 2}, 
                                                       max_jumps  = 10)
 
@@ -60,20 +59,44 @@ hawkes_multi.plot_intensity(ax = ax)
 
 ```py 
 
+np.random.seed(0)
 
-estimator = multivariate_estimator(dimension = 2, 
-                                    mark = False,
-                                    options=None, 
-                                    a_bound = None, 
-                                    bound_b = None,
-                                    interaction_coeff = None)
-estimator.fit(timestamps)
+m=1
+a = -1
+b = 1
+
+## simulation 
+hawkes_multi = exp_thinning_hawkes_multi_marked(m=m,
+                                    a=a, 
+                                    b=b, 
+                                    n=200,
+                                    max_jumps=500)
+hawkes_multi.simulate()
+
+
+estimator = learner_hawkes = estimator_unidim_multi_rep(a_bound = None, bound_b = None)
+estimator.fit(hawkes_multi.timeList, max_jump = True)
 
 ```
 
+### Test
+
+```py 
+
+## test on the value of the coefficient
+stat = learner_hawkes.test_one_coeff( coefficient_index=0, value = 1,plot=True)
+
+## GOF procedure with bootstrap
+stat_hawkes = learner_hawkes.GOF_bootstrap(test_type = 'uniform', 
+                            Nb_SubSample=100, 
+                            plot = True)
+
+```
+
+
 ## Examples 
 
-Complete usage examples are available in the examples folder, with scripts illustrating simulation, estimation, and testing of a unidimensional or multidimensional marked Hawkes process, when either on or more repetitions of the process are available.
+Complete usage examples are available in the examples notebook, with scripts illustrating simulation, estimation, and testing.
 
 
 ## Dependencies
