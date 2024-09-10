@@ -3,7 +3,8 @@ from scipy import stats
 from scipy.optimize import minimize
 from functions.likelihood_functions import *
 from functions.GOF import *
-
+from functions.compensator import *
+from functions.LogLikHessian import *
 
     
 
@@ -216,7 +217,7 @@ class loglikelihood_estimator(object):
             
             
 
-    def fit(self, timestamps:list):
+    def fit(self, timestamps:list, max_time = None, max_jump=None):
         
         """
         Parameters
@@ -231,9 +232,25 @@ class loglikelihood_estimator(object):
                
         """
         
-        
         self.time_jump = timestamps
-        arguments  = (self.time_jump, self.name_arg_f, self.name_arg_phi, self.f, self.phi)
+        
+        if not (max_time or max_jump):
+            print('Must specify if the last time corresponds to the last jump or the maximum observation time')
+            
+        else : 
+            
+            if max_jump is not None:
+                self.timestamps_completed =self.time_jump  + [self.time_jump[-1]]
+            else : 
+                self.timestamps_completed = self.time_jump
+            
+        
+        
+        if self.mark:
+            
+            arguments  = (self.timestamps_completed, self.name_arg_f, self.name_arg_phi, self.f, self.phi)
+        else: 
+            arguments  = (self.timestamps_completed)
             
     
         self.res = minimize(self.loss, self.initial_guess, method="L-BFGS-B",
@@ -252,96 +269,41 @@ class loglikelihood_estimator(object):
         return(self.res.x)
     
     
-    def time_change(self):
+    def time_change(self, compensator_function = None):
         
         
-        if self.mark:
+        if compensator_function is not None:
+            self.transform_time = compensator_function(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
             
-            self.transform_time = time_change_mark_unidim_diff(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
+        elif self.mark:
+            
+            self.transform_time = unidim_MEHP_compensator(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
 
         else: 
-            self.transform_time = time_change_unidim_diff(self.theta_estim, self.time_jump)
+            self.transform_time = unidim_EHP_compensator(self.theta_estim, self.time_jump)
             
+        self.transform_time = self.transform_time[1:]- self.transform_time[:-1]
             
         return(self.transform_time)
     
     
-    def mark_change(self,  cdf = None, borne_inf = -np.inf):
+    def test_one_coeff(self, coefficient_index: int, value : float,alpha =0.05):
         
         
-        """
-        Parameters
-        ----------
-        cdf : the cumulative density function associated to the density f of the marked process
-            cdf must have the same argument as f
-            If cdf is None, the cumulative distribution is computed using integrate.quad of the density f
+        if self.theta_estim[1]<=0 or self.mark:
+            print("Unadapted hessian computation")
+            
+        else : 
+            m_hat, a_hat, b_hat = self.theta_estim
+            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed),  self.timestamps_completed[-1])
+            var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))[coefficient_index]
+            statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index]-value)/var_estim)
+            
+            return({'stat':statistic, 'pval':   2*(1-stats.norm.cdf(statistic))})
+            
+        
+        
          
-        borne_inf: When cdf is None, borne_inf can be specify to make sure the cumulative distribution is computed on the right interval
-            
-            
-        Return
-        ----------   
-        List of float corresponding to the transformation of mark    
-              
-        """
-                    
-        if not self.mark:
-            raise ValueError("Le processus a été définis comme non marqué")
-            
-            
-        if cdf is None:
-
-            self.transform_mark = mark_change_mark_unidim(self.time_jump, self.mark_list, self.f, self.arg_f_estim, borne_inf)
-        
-        else: 
-            self.transform_mark = cdf(self.mark_list, self.tList, **arg_f)
-        return(self.transform_mark)
-            
-
-        
-        
-        if self.mark:
-            
-            self.transform_time = time_change_mark_unidim(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
-
-        else: 
-            self.transform_time = time_change_unidim(self.theta_estim, self.time_jump)
-            
-            
-        return(self.transform_time)
-    
-    
-    def mark_change(self,  cdf = None, borne_inf = -np.inf):
-        
-        
-        """
-        Parameters
-        ----------
-        cdf : the cumulative density function associated to the density f of the marked process
-            cdf must have the same argument as f
-            If cdf is None, the cumulative distribution is computed using integrate.quad of the density f
-         
-        borne_inf: When cdf is None, borne_inf can be specify to make sure the cumulative distribution is computed on the right interval
-            
-            
-        Return
-        ----------   
-        List of float corresponding to the transformation of mark    
-              
-        """
-                    
-        if not self.mark:
-            raise ValueError("Le processus a été définis comme non marqué")
-            
-            
-        if cdf is None:
-
-            self.transform_mark = mark_change_mark_unidim(self.time_jump, self.mark_list, self.f, self.arg_f_estim, borne_inf)
-        
-        else: 
-            self.transform_mark = cdf(self.mark_list, self.tList, **arg_f)
-        return(self.transform_mark)
-            
     
 
 class multivariate_estimator(object):

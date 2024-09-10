@@ -466,7 +466,7 @@ class exp_thinning_hawkes_marked(object):
         self.timestamps += [(self.max_time,0)]
         
         if not self.mark_process: 
-            self.timestamps += [time for time, mark in self.timestamps]
+            self.timestamps = [time for time, mark in self.timestamps]
                       
     
     def plot_intensity(self, ax=None, plot_N=True):
@@ -704,6 +704,7 @@ class exp_thinning_hawkes_multi_marked(object):
         self.timeList = []
 
         for k in range(self.nb_iter):
+            
             self.simulate_time_onces()
             
             if not self.mark_process:
