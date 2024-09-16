@@ -173,7 +173,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
 
     likelihood -= compensator_k
     
-    likelihood_mark = np.sum([f(time, mark , **arg_f) for time, mark in tList[1:-1]])
+    likelihood_mark = np.sum([np.log(f(time, mark , **arg_f)) for time, mark in tList[1:-1]])
     likelihood += likelihood_mark
     
         

@@ -757,3 +757,71 @@ def approx_fisher_with_stationnarity_assumption(list_time, list_mark, mu, a, b, 
 
     return(aprox_fisher)
 
+
+
+def approx_fisher_muti_dim(theta,tList, max_time = False):
+
+    nb_param = np.array(theta).shape[0]
+    dim = int(-1 + np.sqrt(1 + nb_param) )
+
+    m = np.array(theta[:dim]).reshape((dim, 1))
+    a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
+    b = np.array(theta[dim * (dim + 1):]).reshape((dim, 1))
+    
+    
+    if max_time :
+        tList = tList[:-1]
+
+    ## each element of the list contains is associated to a component k 
+    ## and the list  att index k is the value of partial_mi lambda_k(Tl) 
+    partial_m = [ np.array( [0]*i + [1] + [0]*(dim-i-1) ) for i in range(dim)]
+
+
+    ## each element of the list contains is associated to a component k 
+    ## and the list  at index k is the value of partial_alphakj lambda_k(Tl) 
+    partial_a = [np.zeros(b.shape)]*dim  
+
+    ## each element of the list contains is associated to a component k 
+    ## and the list  att index k is the value of partial_betak lambda_k(Tl) 
+    partial_b = np.zeros(b.shape)
+
+
+    lambda_Tk = m ## array containing the value of (lambda_i(Tk)) for each i
+    
+    ## first jump 
+    last_time, last_compo = tList[1]
+    
+    vector_jump = np.concatenate( (partial_m[last_compo-1].flatten(), 
+                                    [0]*(dim*(last_compo-1) ) , partial_a[last_compo-1].flatten(),  [0]* (dim*(dim-last_compo)) ,
+                                    [0]*(last_compo-1) , partial_b[last_compo-1], [0]*(dim-last_compo) ), axis=0)/lambda_Tk[last_compo-1]
+
+
+    fisher_approx = np.outer(vector_jump,vector_jump) ## definition of the approx of fisher matrix
+
+    
+
+    for time, compo in tList[2:]:
+
+        add_last_jump =  np.array([0]*(last_compo-1) + [1] + [0]*(dim-last_compo) ).reshape(dim,1)
+
+
+        partial_a = [ np.exp( - b[k]*(time-last_time) )*(partial_Tk + add_last_jump)  for k,partial_Tk in enumerate(partial_a)]
+
+
+        partial_b = np.multiply((-(time-last_time)* (lambda_Tk+ a[:,last_compo-1].reshape(dim,1)-m) + partial_b),np.exp( -b*(time-last_time) ))
+
+        lambda_Tk = m + np.multiply( np.exp(-b*(time-last_time)),   lambda_Tk + a[:,last_compo-1].reshape((dim,1))-m )
+
+        vector_jump = np.concatenate( (partial_m[last_compo-1].flatten(), 
+                                    [0]*(dim*(last_compo-1) ) , partial_a[last_compo-1].flatten(),  [0]* (dim*(dim-last_compo)) ,
+                                    [0]*(last_compo-1) , partial_b[last_compo-1], [0]*(dim-last_compo) ), axis=0)/lambda_Tk[last_compo-1]
+
+
+
+        fisher_approx+= np.outer(vector_jump,vector_jump)
+
+
+        last_time, last_compo = time, compo
+        
+    return(fisher_approx/time)
+        

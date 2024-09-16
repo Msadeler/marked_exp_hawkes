@@ -4,6 +4,10 @@ import scipy
 def F(mark,t,psi):
     return(1- np.exp( -psi*mark ))
 
+
+def F1(mark,time,psi):
+    return(-1/psi*np.log(1-mark))
+
 def f(t,mark, psi):
     return(psi*np.exp(-psi*mark))
 

@@ -100,7 +100,6 @@ class estimator_unidim_daichan(object):
         return(self.transform_time)
     
     
-      
 class loglikelihood_estimator(object):
     """
     Estimator class for Exponential Hawkes process obtained through minimizaton of a loss using the L-BFGS-B algorithm.
@@ -289,6 +288,25 @@ class loglikelihood_estimator(object):
     
     def test_one_coeff(self, coefficient_index: int, value : float,alpha =0.05):
         
+        """
+        Test a value of a coefficient of the model, the null hypothsis is H0 : theta_i = value against H1 : theta_i != value
+        This test can only  be performed if a is positiv and, if the model is not marked. 
+
+
+        Parameters
+        ----------
+
+        coefficient_index : int
+            Index of the paramter, inside the list self.param_theta, that is tested.
+          
+        value : float
+            Value tested for the parameter
+        
+        alpha : float 
+            level of the test
+        
+        """
+        
         
         if self.theta_estim[1]<=0 or self.mark:
             print("Unadapted hessian computation")
@@ -299,9 +317,43 @@ class loglikelihood_estimator(object):
             var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))[coefficient_index]
             statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index]-value)/var_estim)
             
-            return({'stat':statistic, 'pval':   2*(1-stats.norm.cdf(statistic))})
+            pval= 2*(1-stats.norm.cdf(statistic))
+            
+            return({'stat':statistic, 'pval':   pval, 'results': int(pval<=alpha)})
             
         
+    def test_equality(self, coefficient_index_1: int, coefficient_index_2 : int, float,alpha =0.05):
+        
+        """
+        Test the equlity of two coefficient in model, the null hypothsis is H0 : theta_i = theta_j against H1 : theta_i != theta_j.
+        This test can only  be performed if a is positiv and, if the model is not marked. 
+
+
+        Parameters
+        ----------
+
+        coefficient_index_1, coefficient_index_2 : int
+            Indexes of the paramters, inside the list self.param_theta, which equality is tested.
+
+        
+        alpha : float 
+            level of the test
+        
+        """
+        
+        
+        if self.theta_estim[1]<=0 or self.mark:
+            print("Unadapted hessian computation")
+            
+        else : 
+            m_hat, a_hat, b_hat = self.theta_estim
+            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed),  self.timestamps_completed[-1])
+            var_estim = np.linalg.inv(hessian)
+            statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index_1]-self.theta_estim[coefficient_index_1])/np.sqrt( var_estim[coefficient_index_1, coefficient_index_1] + var_estim[coefficient_index_2,coefficient_index_2]- 2*var_estim[coefficient_index_1,coefficient_index_2]))
+            pval= 2*(1-stats.norm.cdf(statistic))
+            
+            return({'stat':statistic, 'pval':   pval, 'test_output': int(pval>=alpha)})
+            
         
          
     
@@ -447,7 +499,7 @@ class multivariate_estimator(object):
         
         
         if self.mark:     
-            self.loss = opimisation_marked_hawkes
+            self.loss = multivariate_marked_likelihood
             self.bounds =  bound_f + bound_phi+  self.bounds
             self.initial_guess = np.array(initial_guess_f+ initial_guess_phi + self.initial_guess)         
             self.nb_arg_phi = len(bound_phi)
@@ -476,7 +528,7 @@ class multivariate_estimator(object):
         if self.mark:
             argument = (self.time_jump, self.name_arg_phi,self.name_arg_f, self.phi,self.f, self.nb_arg_phi, self.dim)
         else: 
-            argument = (self.time_jump)
+            argument = (self.time_jump,self.dim)
 
         self.res = minimize(self.loss, self.initial_guess, method="L-BFGS-B", 
                 args=argument,
@@ -492,8 +544,7 @@ class multivariate_estimator(object):
 
         return self.res.x
         
-    
-    
+
     def time_change(self):
        
         if not self.fitted:
@@ -501,44 +552,91 @@ class multivariate_estimator(object):
     
         if self.mark:
 
-            self.transform_time = time_change_mark_multidim(theta = self.theta_estim, 
+            self.transform_time = multi_MEHP_compensator(theta = self.theta_estim, 
                                                                tList = self.time_jump, 
                                                                phi = self.phi,
                                                                arg_phi = self.arg_phi_estim)
-        else: 
-            self.transform_time = time_change_multidim(theta = self.theta_estim, tList = self.time_jump)
             
-        return(self.transform_time)
-   
-    def mark_change(self,  cdf = None, borne_inf = -np.inf):
-       
-      
-       """
-       Parameters
-       ----------
-       cdf : the cumulative density function associated to the density f of the marked process
-           cdf must have the same argument as f
-           If cdf is None, the cumulative distribution is computed using integrate.quad of the density f
+            
+        else: 
+            self.transform_time = multi_EHP_compensator(theta = self.theta_estim, tList = self.time_jump)
+            
+            
+        return( self.transform_time[1:] - self.transform_time[:-1])
+    
+    
+    def test_one_coeff(self, coefficient_index: int, value : float,alpha =0.05):
         
-       borne_inf: When cdf is None, borne_inf can be specify to make sure the cumulative distribution is computed on the right interval
-           
-           
-       Return
-       ----------   
-       List of float corresponding to the transformation of mark    
-             
-       """
-       if not self.mark:
-           raise ValueError("The process was defined as unmarked")
+        
+        """
+        Test a value of a coefficient of the model, the null hypothsis is H0 : theta_i = value against H1 : theta_i != value
+        This test can only  be performed if a is positiv and, if the model is not marked. 
 
-       if not self.fitted:
-           raise ValueError("Estimator need to be fitted first")           
-           
-       if cdf is None:
 
-           self.transform_mark = mark_change_mark_unidim(self.time_jump, self.mark_list, self.f, self.arg_f_estim, borne_inf)
-       
-       else: 
-           self.transform_mark = cdf(self.mark_list, self.tList, **arg_f)
-       return(self.transform_mark)
+        Parameters
+        ----------
 
+        coefficient_index : int
+            Index of the paramter, inside the list self.param_theta, that is tested.
+          
+        value : float
+            Value tested for the parameter
+        
+        alpha : float 
+            level of the test
+        """
+        
+        if self.mark:
+            print("Computation can't be performed as the model is marked")
+            
+        elif sum( np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim, self.dim))>0)!=dim**2 :
+            print(r"Computation can't be performed as one $\hat{a}_{ij}$ is negative ")
+            
+            
+        else : 
+            
+            hessian = approx_fisher_muti_dim(  self.theta_estim, np.array(self.timestamps),  max_time= self.max_times)
+            var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))[coefficient_index]
+            statistic  =  np.sqrt(self.max_times)*(np.array( self.theta_estim)[:,coefficient_index]- value)/np.array(var_estim)[:,coefficient_index]    
+
+            pval = 2*(1-stats.norm.cdf(statistic))
+            return({'stat':statistic, 'pval':   pval , 'test_output': int(pval>=alpha)})
+
+   
+    def test_equality_coeff(self, coefficient_index_1: int,coefficient_index_2: int,alpha =0.05):
+        
+        
+        """
+        Test the equlity of two coefficient in model, the null hypothsis is H0 : theta_i = theta_j against H1 : theta_i != theta_j.
+        This test can only  be performed if a is positiv and, if the model is not marked. 
+
+
+        Parameters
+        ----------
+
+        coefficient_index_1, coefficient_index_2 : int
+            Indexes of the paramters, inside the list self.param_theta, which equality is tested.
+
+        
+        alpha : float 
+            level of the test
+        
+        """
+        
+        if self.mark:
+            print("Computation can't be performed as the model is marked")
+            
+        elif sum( np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim, self.dim))>0)!=dim**2 :
+            print(r"Computation can't be performed as one $\hat{a}_{ij}$ is negative ")
+            
+            
+        else : 
+            
+            hessian = approx_fisher_muti_dim(  self.theta_estim, np.array(self.timestamps),  max_time= self.max_times)
+            var_estim = np.linalg.inv(hessian)
+            statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index_1]-self.theta_estim[coefficient_index_1])/np.sqrt( var_estim[coefficient_index_1, coefficient_index_1] + var_estim[coefficient_index_2,coefficient_index_2]- 2*var_estim[coefficient_index_1,coefficient_index_2]))
+            pval= 2*(1-stats.norm.cdf(statistic))
+            
+            return({'stat':statistic, 'pval':   2*(1-stats.norm.cdf(statistic)), 'test_output': int(pval>=alpha)})
+
+   
