@@ -286,7 +286,7 @@ class loglikelihood_estimator(object):
         return(self.transform_time)
     
     
-    def test_one_coeff(self, coefficient_index: int, value : float,alpha =0.05):
+    def test_one_coeff(self, coefficient_index: int, value : float):
         
         """
         Test a value of a coefficient of the model, the null hypothsis is H0 : theta_i = value against H1 : theta_i != value
@@ -313,16 +313,16 @@ class loglikelihood_estimator(object):
             
         else : 
             m_hat, a_hat, b_hat = self.theta_estim
-            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed),  self.timestamps_completed[-1])
+            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed)[:-1],  self.timestamps_completed[-1])
             var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))[coefficient_index]
             statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index]-value)/var_estim)
             
             pval= 2*(1-stats.norm.cdf(statistic))
             
-            return({'stat':statistic, 'pval':   pval, 'results': int(pval<=alpha)})
+            return({'stat':statistic, 'pval':   pval})
             
         
-    def test_equality(self, coefficient_index_1: int, coefficient_index_2 : int, float,alpha =0.05):
+    def test_equality(self, coefficient_index_1: int, coefficient_index_2 : int):
         
         """
         Test the equlity of two coefficient in model, the null hypothsis is H0 : theta_i = theta_j against H1 : theta_i != theta_j.
@@ -347,12 +347,12 @@ class loglikelihood_estimator(object):
             
         else : 
             m_hat, a_hat, b_hat = self.theta_estim
-            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed),  self.timestamps_completed[-1])
+            hessian = likelihood_hessien_unidim(m_hat, a_hat, b_hat, np.array(self.timestamps_completed)[:-1],  self.timestamps_completed[-1])
             var_estim = np.linalg.inv(hessian)
             statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index_1]-self.theta_estim[coefficient_index_1])/np.sqrt( var_estim[coefficient_index_1, coefficient_index_1] + var_estim[coefficient_index_2,coefficient_index_2]- 2*var_estim[coefficient_index_1,coefficient_index_2]))
             pval= 2*(1-stats.norm.cdf(statistic))
             
-            return({'stat':statistic, 'pval':   pval, 'test_output': int(pval>=alpha)})
+            return({'stat':statistic, 'pval':   pval})
             
         
          
@@ -512,7 +512,7 @@ class multivariate_estimator(object):
         self.fitted = False
             
 
-    def fit(self, timestamps,limit=1000):
+    def fit(self, timestamps, max_time = None, max_jump=None):
         
         """
         Parameters
@@ -525,10 +525,21 @@ class multivariate_estimator(object):
 
         self.time_jump = timestamps
         
+        
+        if not (max_time or max_jump):
+            print('Must specify if the last time corresponds to the last jump or the maximum observation time')
+            
+        else : 
+            
+            if max_jump is not None:
+                self.timestamps_completed =self.time_jump  + [self.time_jump[-1]]
+            else : 
+                self.timestamps_completed = self.time_jump
+        
         if self.mark:
-            argument = (self.time_jump, self.name_arg_phi,self.name_arg_f, self.phi,self.f, self.nb_arg_phi, self.dim)
+            argument = (self.timestamps_completed, self.name_arg_phi,self.name_arg_f, self.phi,self.f, self.nb_arg_phi, self.dim)
         else: 
-            argument = (self.time_jump,self.dim)
+            argument = (self.timestamps_completed,self.dim)
 
         self.res = minimize(self.loss, self.initial_guess, method="L-BFGS-B", 
                 args=argument,
@@ -565,7 +576,7 @@ class multivariate_estimator(object):
         return( self.transform_time[1:] - self.transform_time[:-1])
     
     
-    def test_one_coeff(self, coefficient_index: int, value : float,alpha =0.05):
+    def test_one_coeff(self, coefficient_index: int, value : float):
         
         
         """
@@ -589,21 +600,21 @@ class multivariate_estimator(object):
         if self.mark:
             print("Computation can't be performed as the model is marked")
             
-        elif sum( np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim, self.dim))>0)!=dim**2 :
+        elif len( np.where(np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim**2))>0)[0])!=self.dim**2 :
             print(r"Computation can't be performed as one $\hat{a}_{ij}$ is negative ")
             
             
         else : 
             
-            hessian = approx_fisher_muti_dim(  self.theta_estim, np.array(self.timestamps),  max_time= self.max_times)
-            var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))[coefficient_index]
-            statistic  =  np.sqrt(self.max_times)*(np.array( self.theta_estim)[:,coefficient_index]- value)/np.array(var_estim)[:,coefficient_index]    
+            hessian = approx_fisher_muti_dim(  self.theta_estim, self.timestamps_completed[:-1],  self.timestamps_completed[-1][0])
+            var_estim = np.sqrt(np.diag(np.linalg.inv(hessian)))
+            statistic  =  np.abs(np.sqrt(self.timestamps_completed[-1][0])*(np.array( self.theta_estim)[coefficient_index]- value))/np.array(var_estim)[coefficient_index]    
 
             pval = 2*(1-stats.norm.cdf(statistic))
-            return({'stat':statistic, 'pval':   pval , 'test_output': int(pval>=alpha)})
+            return({'stat':statistic, 'pval':   pval })
 
    
-    def test_equality_coeff(self, coefficient_index_1: int,coefficient_index_2: int,alpha =0.05):
+    def test_equality_coeff(self, coefficient_index_1: int,coefficient_index_2: int):
         
         
         """
@@ -626,17 +637,17 @@ class multivariate_estimator(object):
         if self.mark:
             print("Computation can't be performed as the model is marked")
             
-        elif sum( np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim, self.dim))>0)!=dim**2 :
+        elif len( np.where(np.array(self.theta_estim[self.dim:self.dim * (self.dim + 1)]).reshape((self.dim**2))>0)[0])!=self.dim**2 :
             print(r"Computation can't be performed as one $\hat{a}_{ij}$ is negative ")
             
             
         else : 
             
-            hessian = approx_fisher_muti_dim(  self.theta_estim, np.array(self.timestamps),  max_time= self.max_times)
+            hessian = approx_fisher_muti_dim(  self.theta_estim, self.timestamps_completed[:-1],  max_time= self.timestamps_completed[-1][0])
             var_estim = np.linalg.inv(hessian)
-            statistic = np.abs(np.sqrt(self.time_jump[-1])*(self.theta_estim[coefficient_index_1]-self.theta_estim[coefficient_index_1])/np.sqrt( var_estim[coefficient_index_1, coefficient_index_1] + var_estim[coefficient_index_2,coefficient_index_2]- 2*var_estim[coefficient_index_1,coefficient_index_2]))
+            statistic = np.abs(np.sqrt(self.timestamps_completed[-1][0])*(self.theta_estim[coefficient_index_1]-self.theta_estim[coefficient_index_2])/np.sqrt( var_estim[coefficient_index_1, coefficient_index_1] + var_estim[coefficient_index_2,coefficient_index_2]- 2*var_estim[coefficient_index_1,coefficient_index_2]))
             pval= 2*(1-stats.norm.cdf(statistic))
             
-            return({'stat':statistic, 'pval':   2*(1-stats.norm.cdf(statistic)), 'test_output': int(pval>=alpha)})
+            return({'stat':statistic, 'pval':   pval})
 
    
