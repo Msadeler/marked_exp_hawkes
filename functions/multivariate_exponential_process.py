@@ -33,7 +33,7 @@ class multivariate_exponential_hawkes_marked(object):
                  a, 
                  b,
                  phi = lambda x: 1, 
-                 F = lambda x,t: 1,
+                 F = lambda x: 1,
                  arg_phi = {}, 
                  arg_F = {},
                  max_jumps=None, 
@@ -129,7 +129,7 @@ class multivariate_exponential_hawkes_marked(object):
 
          previous_t = t
          t += np.random.exponential(1 / upper_intensity)
-         mark = self.F(np.random.uniform(),t , **self.arg_F)
+         mark = self.F(np.random.uniform(), **self.arg_F)
          
          ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - previous_t)))
          
@@ -176,7 +176,7 @@ class multivariate_exponential_hawkes_marked(object):
 
             previous_t = t
             t += np.random.exponential(1 / upper_intensity)
-            mark = self.F(np.random.uniform(),t , **self.arg_F)
+            mark = self.F(np.random.uniform(), **self.arg_F)
 
 
             # ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - self.timestamps[-1][0])))
@@ -595,7 +595,7 @@ class multivariate_exponential_hawkes_marked_multi(object):
                  t_0=0,
                  mark_process = False,
                  phi = lambda x: 1, 
-                 F = lambda x,t: 1,
+                 F = lambda x: 1,
                  arg_phi = {}, 
                  arg_F = {},
                  max_jumps=None, 
@@ -691,7 +691,7 @@ class multivariate_exponential_hawkes_marked_multi(object):
 
          previous_t = t
          t += np.random.exponential(1 / upper_intensity)
-         mark = self.F(np.random.uniform(),t , **self.arg_F)
+         mark = self.F(np.random.uniform() , **self.arg_F)
          
          ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - previous_t)))
          
@@ -740,7 +740,7 @@ class multivariate_exponential_hawkes_marked_multi(object):
 
             previous_t = t
             t += np.random.exponential(1 / upper_intensity)
-            mark = self.F(np.random.uniform(),t , **self.arg_F)
+            mark = self.F(np.random.uniform(), **self.arg_F)
 
 
             # ij_intensity = np.multiply(ij_intensity, np.exp(-self.b * (t - self.timestamps[-1][0])))

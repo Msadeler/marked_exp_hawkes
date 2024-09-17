@@ -326,7 +326,7 @@ class exp_thinning_hawkes_marked(object):
                  max_time=None, 
                  mark_process = False, 
                  phi = lambda x: 1, 
-                 F = lambda x,t: 1,
+                 F = lambda x: 1,
                  arg_phi = {}, 
                  arg_F = {}):
         
@@ -425,7 +425,7 @@ class exp_thinning_hawkes_marked(object):
             upper_intensity = max(self.m, candidate_intensity)
 
             self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)
+            self.mark = self.F(np.random.uniform(), **self.arg_F)
             
             candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0]))
 
@@ -453,7 +453,7 @@ class exp_thinning_hawkes_marked(object):
                                   self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0])))
 
             self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F) 
+            self.mark = self.F(np.random.uniform() , **self.arg_F) 
             candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0]))
 
             flag = self.t < self.max_time
@@ -556,7 +556,7 @@ class exp_thinning_hawkes_multi_marked(object):
                  max_jumps=None, 
                  max_time=None, 
                  phi = lambda x: 1, 
-                 F = lambda x,t: 1,
+                 F = lambda x: 1,
                  arg_phi = {}, 
                  arg_F = {}):
         
@@ -659,7 +659,7 @@ class exp_thinning_hawkes_multi_marked(object):
             upper_intensity = max(self.m, candidate_intensity)
 
             self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F)
+            self.mark = self.F(np.random.uniform() , **self.arg_F)
             
             candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0]))
 
@@ -683,7 +683,7 @@ class exp_thinning_hawkes_multi_marked(object):
                                   self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0])))
 
             self.t += np.random.exponential(1 / upper_intensity)
-            self.mark = self.F(np.random.uniform(),self.t , **self.arg_F) 
+            self.mark = self.F(np.random.uniform(), **self.arg_F) 
             candidate_intensity = self.m + self.aux * np.exp(-self.b * (self.t - self.timestamps[-1][0]))
 
             flag = self.t < self.max_time

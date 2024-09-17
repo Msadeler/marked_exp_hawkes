@@ -173,7 +173,7 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
 
     likelihood -= compensator_k
     
-    likelihood_mark = np.sum([np.log(f(time, mark , **arg_f)) for time, mark in tList[1:-1]])
+    likelihood_mark = np.sum([np.log(f(mark , **arg_f)) for time, mark in tList[1:-1]])
     likelihood += likelihood_mark
     
         
@@ -301,7 +301,7 @@ Returns
         time_b = time_c
     likelihood = log_i - compensator
 
-    likelihood += np.sum(list(map(lambda y : np.log(f(y[2], y[0], **arg_f)), tList)))
+    likelihood += np.sum(list(map(lambda y : np.log(f(y[2], **arg_f)), tList)))
 
     
     if not(dimensional):
@@ -492,73 +492,6 @@ Returns
     if not(dimensional):
         likelihood = np.sum(likelihood)
     return -likelihood
-
-
-def multivariate_likelihood_different_b(theta, tList,dim):
-    
-    
-    lambda0 = np.array(theta[:dim]).reshape((dim, 1))
-    a = np.array(theta[dim:dim * (dim + 1)]).reshape((dim, dim))
-    b = np.array(theta[dim * (dim + 1):]).reshape((dim, dim))
-
-    
-    b = b +1e-10
-    
-
-    
-    ## vecteur qui continent la somme des log( lambda_i ( T^i_k )), chaque ligne correspondant à un i différent
-    lambdai_Tk_i = np.zeros((dim,1))
-    
-    ## initialisation avec le premier saut
-    lambdai_Tk_i[tList[1][1]-1,0]+= np.log( lambda0[tList[1][1]-1,0])
-    
-    ## vecteur qui contient la somme des intégrales lambda_i entre T_{(k)} et T_{(k+1)}, chaque ligne correspondant à un i différent
-    ## on initialise par la valeur de l'intégrale entre à et T_{(1)}
-    inti_Tk = lambda0*tList[1][0]
-
-    previous_time =  tList[1][0]
-    
-    
-    ## matrice stockant, pour chaque saut les (a_{i,mk}) avec mk la composante qui a sauté au k-ième temps de saut, 
-    ## une ligne correspondant a un i . De même pour b
-    
-    a_jump = a[ :,tList[1][1]-1].reshape(dim,1)
-    b_jump = b[:,tList[1][1]-1].reshape(dim,1)
-
-    diff_time = np.array([])
-    
-
-    
-    for k in range(len(tList[2:-1])):
-        
-        time,compo = tList[k+2]
-        
-        diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
-        
-        lambdai_Tk_i[compo-1,0]+= np.log(lambda0[compo-1,0] + np.sum( a_jump[compo-1,:]* np.exp(-b_jump[compo-1,:]*diff_time)) )
-    
-        
-               
-               
-        inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
-              
-        previous_time = time 
-        
-        a_jump = np.concatenate((a[:,compo-1].reshape(dim,1),a_jump), axis=1)
-        b_jump = np.concatenate( (b[:,compo-1].reshape(dim,1),b_jump), axis=1)
-        
-    time = tList[-1][0]
-    diff_time = np.array([ time - previous_time ] +  (time - previous_time + diff_time).tolist())
-        
-    inti_Tk[:,0]+= lambda0[:,0]*(time - previous_time) +  np.sum( a_jump/b_jump*(np.exp(-b_jump*( previous_time- time  + diff_time)) - np.exp(-b_jump*diff_time)), axis= 1 )
-   
-    #print(inti_Tk)
-    likelihood = np.sum(lambdai_Tk_i) - np.sum(inti_Tk)
-    
-     
-    return(-likelihood)
-
-
 
 """
     FIN

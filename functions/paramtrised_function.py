@@ -1,14 +1,10 @@
 import numpy as np
 import scipy
 
-def F(mark,t,psi):
-    return(1- np.exp( -psi*mark ))
-
-
-def F1(mark,time,psi):
+def F(mark,psi):
     return(-1/psi*np.log(1-mark))
 
-def f(t,mark, psi):
+def f(mark, psi):
     return(psi*np.exp(-psi*mark))
 
 def phi(mark, gamma, psi):
