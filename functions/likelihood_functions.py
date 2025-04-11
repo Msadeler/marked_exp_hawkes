@@ -1,6 +1,49 @@
 # Imports
 import numpy as np
 from scipy.optimize import minimize
+import pandas as pd
+
+def loglik_bootstap(theta,  times_hawkes_boot , tlist_original,phi, f, name_arg_f, name_arg_phi, compensator_func):
+  
+  
+  m,a,b = np.array(theta[-3:])
+  if b<= 0 or m<= 0 :
+      return(1e100)
+  arg_f = dict(zip(list(name_arg_f) ,theta[:len(name_arg_f)]))
+  arg_phi = dict(zip(list(name_arg_phi),theta[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
+
+  comp = compensator_func(tlist_original,theta = theta[-3:], phi = phi,arg_f = arg_f, arg_phi=arg_phi)[-1]
+
+  last_time,last_mark =tlist_original[1]
+  intensity =[0,a*phi(last_mark, **arg_f, **arg_phi)]
+
+  for time,mark in tlist_original[2:]:
+      intensity += [   np.exp(-b*(time - last_time))*intensity[-1] +a*phi( mark, **arg_phi, **arg_f) ]
+      last_time = time
+
+
+  tlist_boot= pd.DataFrame(times_hawkes_boot[1:-1],  columns = ['boottime', 'markboot'])
+  hawkes_initial = pd.DataFrame( tlist_original, columns=['Tk', 'kappak'])
+  hawkes_initial['intensity'] = intensity
+
+
+  last_jump = pd.cut(tlist_boot['boottime'],
+                      bins = hawkes_initial['Tk'].tolist(), 
+                      right=True,
+                      labels =hawkes_initial['Tk'][:-1].tolist()).rename('Tk').astype(float)
+
+
+  cuting_time = pd.merge(left = last_jump,
+                      right = tlist_boot, 
+                      left_index = True,
+                      right_index=True ).merge(hawkes_initial, 
+                      left_on = 'Tk',
+                      right_on='Tk')
+
+  lambdak = (m + cuting_time['intensity']*np.exp( -b*(cuting_time['boottime']- cuting_time['Tk']))).apply( lambda x : np.log( max(x,0) + int((x<=0)) ) - max(-x,0)*1e100)  
+  logllik_mark =  np.sum(np.log(f(tlist_boot['markboot'],**arg_f) ))
+  loglik = np.sum(lambdak) -comp +logllik_mark
+  return(-loglik)
 
 
 def likelihood_Poisson(theta, tList, **kwargs):
@@ -125,7 +168,6 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
     arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
     theta = x[len(name_arg_f)+len(name_arg_phi):]
     
-
     # unpack hawkes parameters 
     lambda0, a, b  = theta
 
@@ -136,10 +178,9 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
         compensator_k = lambda0 * (tList[1][0]-tList[0][0])
         lambda_avant = lambda0
         lambda_k = lambda0 + a*phi(tList[1][1],**arg_phi, **arg_f)
-    
     likelihood = np.log(lambda_avant) - compensator_k 
     
-    
+
     for k in range(2, len(tList)-1):
         
         if lambda_k >= 0:            
@@ -150,15 +191,16 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
             tau_star = tList[k][0] - tList[k - 1][0] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
 
         lambda_avant = lambda0 + (lambda_k - lambda0) * np.exp(-b * (tList[k][0] - tList[k - 1][0]))
+
         lambda_k = lambda_avant + a*phi(tList[k][1],**arg_phi, **arg_f)
         compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
 
         if lambda_avant <= 0:
              return 1e5
-         
         likelihood += np.log(lambda_avant) - compensator_k  
-    
 
+
+    k = len(tList)-1
     if lambda_k >= 0:
         C_k = lambda_k - lambda0
         tau_star = tList[k][0] - tList[k - 1][0]
@@ -168,11 +210,11 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
 
     compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
 
+
     if lambda_avant <= 0:
         return 1e5
 
     likelihood -= compensator_k
-    
     likelihood_mark = np.sum([np.log(f(mark , **arg_f)) for time, mark in tList[1:-1]])
     likelihood += likelihood_mark
     
@@ -180,6 +222,15 @@ def loglikelihoodMarkedHawkes(x, tList,  name_arg_f, name_arg_phi, f, phi):
      # We return the opposite of the likelihood in order to use minimization packages.
     return -likelihood
 
+
+def minimization_function( x, loss, initial_guess, bounds, options, args=()):
+    res = minimize(loss,
+            x0 =initial_guess, 
+            bounds=bounds,
+            options=options,
+            args=(x, *args) )
+
+    return(res.x)
 
 def minimization_unidim_unmark(list_times, loss, initial_guess, bounds, options):
      return(minimize(loss, x0 = initial_guess, method="L-BFGS-B",args=(list_times), bounds=bounds, options=options))
@@ -222,12 +273,7 @@ Returns
         Value of likelihood at each process.
         The value returned is the opposite of the mathematical likelihood in order to use minimization packages.
     """
-    
-    arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
-    arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
-    theta = x[len(name_arg_f)+len(name_arg_phi):]         
-    
-    
+        
     arg_f = dict(zip(list(name_arg_f) ,x[:len(name_arg_f)]))
     arg_phi = dict(zip(list(name_arg_phi),x[len(name_arg_f) :len(name_arg_f)+len(name_arg_phi)]))
     theta = x[len(name_arg_f)+len(name_arg_phi):]    
@@ -362,9 +408,7 @@ def loglikelihood(theta, tList, **kwargs):
             lambda_avant = lambda0 + (lambda_k - lambda0) * np.exp(-b * (tList[k] - tList[k - 1]))
             lambda_k = lambda_avant + a
             compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
-            
-            
-            
+                        
             if lambda_avant <= 0:
                 return 1e5
             
@@ -382,7 +426,7 @@ def loglikelihood(theta, tList, **kwargs):
             tau_star = tList[k] - tList[k - 1] - (np.log(-(lambda_k - lambda0)) - np.log(lambda0)) / b
 
         compensator_k = lambda0 * tau_star + (C_k / b) * (1 - np.exp(-b * tau_star))
-        
+    
         likelihood -=  compensator_k
         # We return the opposite of the likelihood in order to use minimization packages.
         
@@ -449,7 +493,7 @@ Returns
     ic = mu + a[:, [mb - 1]]
     # j=1
 
-    for tc, mc in timestamps[2:]:
+    for tc, mc in timestamps[2:-1]:
 
 
         # First we estimate the compensator
@@ -488,7 +532,21 @@ Returns
             ic += a[:, [mc - 1]]
 
         tb = tc
-    likelihood = log_i - compensator
+
+    tc, mc = timestamps[-1]
+    inside_log = (mu - np.minimum(ic, 0))/mu
+
+    # Restart time
+    t_star = tb + np.multiply(b_1, np.log(inside_log))
+
+    aux = 1/inside_log  # inside_log can't be equal to zero (coordinate-wise)
+    aux = np.minimum(1, aux)
+    
+    
+    compensator += (t_star < tc)*(np.multiply(mu, tc-t_star) + np.multiply(b_1, ic-mu)*(aux - np.exp(-b*(tc-tb))))
+
+    likelihood =  log_i- compensator
+
     if not(dimensional):
         likelihood = np.sum(likelihood)
     return -likelihood
@@ -496,7 +554,3 @@ Returns
 """
     FIN
 """
-
-
-
-

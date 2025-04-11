@@ -1,12 +1,18 @@
 import numpy as np
 from scipy import stats
 from scipy.optimize import minimize
+import scipy.stats
 from functions.likelihood_functions import *
 from functions.GOF import *
 from functions.compensator import *
 from functions.LogLikHessian import *
+from functions.bootstrap.simulation_boostrap import *
+import multiprocessing
+import functools
+from functions.paramtrised_function import *
+import scipy.stats
 
-    
+
 
 class estimator_unidim_daichan(object):
     """
@@ -55,7 +61,7 @@ class estimator_unidim_daichan(object):
             
             
 
-    def fit(self, timestamps:list , markList=[]):
+    def fit(self, timestamps:list):
         
         """
         Parameters
@@ -94,12 +100,11 @@ class estimator_unidim_daichan(object):
     def time_change(self):
         
  
-        self.transform_time = time_change_unidim_diff(self.a_estim, self.time_jump)
+        self.transform_time = unidim_EHP_compensator([self.m, self.a_estim, self.beta], self.time_jump)
             
             
         return(self.transform_time)
-    
-    
+
 class loglikelihood_estimator(object):
     """
     Estimator class for Exponential Hawkes process obtained through minimizaton of a loss using the L-BFGS-B algorithm.
@@ -191,7 +196,7 @@ class loglikelihood_estimator(object):
              
              
              if not ( len(initial_guess_phi) == len(bound_phi) )  and (len(name_arg_phi)== len(bound_phi) ) and  (len(initial_guess_phi) == len(name_arg_phi)):
-                 raise ValueError(" Issu with argument of the impact function:  one among initial_guess_phi,bound_phi or  name_arg_phi containt too much or not enougth argument")     
+                raise ValueError(" Issu with argument of the impact function:  one among initial_guess_phi,bound_phi or  name_arg_phi containt too much or not enougth argument")     
         
         self.mark = mark
         self.options = options
@@ -272,16 +277,16 @@ class loglikelihood_estimator(object):
         
         
         if compensator_function is not None:
-            self.transform_time = compensator_function(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
+            self.transform_time = compensator_function(self.time_jump,self.theta_estim, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
             
         elif self.mark:
             
-            self.transform_time = unidim_MEHP_compensator(self.theta_estim, self.time_jump, self.mark_list, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
+            self.transform_time = unidim_MEHP_compensator( self.time_jump,self.theta_estim, self.phi, self.f, self.arg_f_estim, self.arg_phi_estim)
 
         else: 
-            self.transform_time = unidim_EHP_compensator(self.theta_estim, self.time_jump)
+            self.transform_time = unidim_EHP_compensator(self.time_jump, self.theta_estim)
             
-        self.transform_time = self.transform_time[1:]- self.transform_time[:-1]
+        self.increment = self.transform_time[1:]- self.transform_time[:-1]
             
         return(self.transform_time)
     
@@ -353,10 +358,212 @@ class loglikelihood_estimator(object):
             pval= 2*(1-stats.norm.cdf(statistic))
             
             return({'stat':statistic, 'pval':   pval})
+               
+
+
+class estimator_bootstrap(object):
+    """
+    Estimator class for Non-marked Exponential Hawkes process obtained through minimizaton of a loss using the L-BFGS-B algorithm.
+    mu and beta are known
+
+    """
+
+    def __init__(self, 
+                 estimator = loglikelihood_estimator,
+                 loss=loglikelihood, 
+                 a_bound = None, 
+                 initial_guess=np.array((1.0, 0.0, 1.0)), 
+                 options={'disp': False}, 
+                 mark=False, 
+                 F = f_unit,
+                 name_arg_f=[], 
+                 name_arg_phi=[], 
+                 f=f_unit,
+                 phi=phi_unit,
+                 initial_guess_f = [], 
+                 initial_guess_phi = [], 
+                 bound_phi = [],
+                 bound_f = [],
+                 bound_beta = None):
+        
+        """
+        Parameters
+        ----------
+        loss : {loglikelihood, likelihood_approximated} or callable.
+            Function to minimize. Default is loglikelihood.
+        
+        a_bound: None or True
+            Wheter of not to consider inhibition. If None, inhibition is autorised, otherwise, inhibition is prohibed
+            Default is None
+
+            
+        initial_guess : array of float.
+            Initial guess for estimated parameters. 
+            Default is np.array((1.0, 0.0, 1.0)).
+            
+            
+        options : dict
+            Options to pass to the minimization method. Default is {'disp': False}.
+            
+        mark: bool
+            Whether to consider a mark. Default is False
+            
+        f: density function
+            function of (t, mark) that give the density of the mark at time t
+        
+        phi: function
+            impact's function of the neuron on the process. This function must be strictly positive.
+            
+        name_arg_f : list 
+            dict containing the name of the arguments of f 
+            
+        name_arg_phi : list 
+            dict containing the name of the arguments of phi  
+            
+            
+        initial_guess_f: list 
+            contains a list of the initial value for each parameters of f. 
+            This values will be use to initiate the minimization of log-lik
+            
+        initial_guess_phi  list 
+            contains a list of the initial value for each parameters of phi. 
+            This values will be use to initiate the minimization of log-lik
+            
+        bound_f : list
+            list of bound, one for each parameters of f. 
+            This list is use to constriain the value of those parameters during log-lik minimization
+            
+        bound_phi : list
+            list of bound, one for each parameters of phi. 
+            This list is use to constriain the value of those parameters during log-lik minimization
             
         
-         
-    
+        """
+
+        self.mark = mark
+        self.options = options
+        self.name_arg_f = name_arg_f
+        self.name_arg_phi = name_arg_phi
+        self.f = f
+        self.F = F
+        self.phi = phi
+        self.bound_beta = bound_beta
+        self.estimator =estimator
+        self.loss = loss
+        self.a_bound = a_bound
+
+        self.learner = self.estimator(loss = self.loss, 
+                                      a_bound = self.a_bound, 
+                                      initial_guess= initial_guess,
+                                      options = self.options,
+                                      mark = self.mark,
+                                      name_arg_f= self.name_arg_f,
+                                      name_arg_phi=self.name_arg_phi,
+                                      f = self.f, 
+                                      phi = self.phi, 
+                                      bound_phi= bound_phi, 
+                                      bound_f= bound_f,
+                                      bound_beta= self.bound_beta,
+                                      initial_guess_f = initial_guess_f, 
+                                      initial_guess_phi = initial_guess_phi)
+
+    def boostrap_procedure(self, 
+                           tlist,
+                           rec_formula ,
+                            B = 100, 
+                            nb_cores = None,  
+                            max_jump = False, 
+                            max_time  = True
+                            ):
+        """
+        Perform the boostrap procedure 
+
+        Argument
+        ----------
+        tlist : list or array
+            The list of original timestamps
+        B  : int 
+            Number of simulation for the bootstrap procedure
+        """
+        self.B = B
+        self.timelist = tlist
+
+        self.thetahat = self.learner.fit(self.timelist, max_jump=max_jump, max_time=max_time)
+
+        self.fit = True
+
+        self.arg_f_hat = dict(zip(list(self.name_arg_f) ,self.thetahat[:len(self.name_arg_f)]))
+        self.arg_phi_hat = dict(zip(list(self.name_arg_phi),self.thetahat[len(self.name_arg_f) :len(self.name_arg_f)+len(self.name_arg_phi)]))
+        mhat, ahat, bhat = self.thetahat[-3:]
+
+
+        if ahat< bhat:
+
+            if not self.mark:
+                self.timelist = [(time, 1) for time in self.timelist]
+
+        
+            self.intensity_jumps = [self.thetahat[-3]]
+            last_time, last_mark = self.timelist[1]
+            
+            for timejump, mark in self.timelist[2:]:
+                self.intensity_jumps +=[mhat + np.exp(-bhat*(timejump-last_time))*(self.intensity_jumps[-1]+ahat*self.phi(last_mark, **self.arg_f_hat, **self.arg_phi_hat )-mhat)]
+                last_time = timejump
+                last_mark = mark
+
+            self.time_transformed = [0] + unidim_MEHP_compensator( self.timelist, theta = self.thetahat[-3:], phi = self.phi, arg_f =self.arg_f_hat, arg_phi = self.arg_phi_hat)
+        
+
+            simulation_boostrap = simu_boostrap(
+                    theta = self.thetahat[-3:],
+                    phi = self.phi, 
+                    arg_f =self.arg_f_hat, 
+                    F = self.F,
+                    arg_phi = self.arg_phi_hat,
+                    times_hawkes = self.timelist, 
+                    s=self.timelist[0][0], 
+                    B =B,
+                    mark_process = True, 
+                    intensity_jump = self.intensity_jumps,
+                    rec_compensator =  rec_formula, 
+                    time_transformed = self.time_transformed)
+        
+            print("Start bootsrap simulation")
+            simulation_boostrap.simulate()
+
+            self.boot_rep = simulation_boostrap.timeList
+            print('End bootsrap simulation')
+
+            if not nb_cores: 
+                nb_cores = multiprocessing.cpu_count()-1 
+
+            if not self.mark:
+                args = ()
+            else : 
+                args = (self.timelist,self.phi, self.f, self.name_arg_f, self.name_arg_phi,unidim_MEHP_compensator)
+
+            pool = multiprocessing.Pool(nb_cores)                         
+            results = pool.map(functools.partial(minimization_function,
+                                                loss=loglik_bootstap,
+                                                initial_guess=self.learner.initial_guess, 
+                                                bounds=self.learner.bounds, 
+                                                options=self.options,
+                                                args=args) , self.boot_rep)
+            pool.close()
+
+            self.param_estim = np.array(results)
+        
+        else : 
+            self.param_estim = []
+            print("Estimation return parameter such that a>b, as a result, no process can be simulated")
+
+
+    def test_one_coeff(self, coefficient_index: int, value : float, alpha = 0.05):
+
+        if len(self.param_estim)>0:
+            stat = np.abs( self.thetahat[coefficient_index])/np.std(  self.param_estim[:,coefficient_index], ddof=-1)
+            return( {'stat': stat, 'quantile':scipy.stats.norm.ppf(1-alpha/2)})
+        
 
 class multivariate_estimator(object):
     """

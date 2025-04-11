@@ -13,7 +13,7 @@ def poisson_compensator(tList,theta, **kwargs):
     return([mu*time for time in tList[1:]])
 
 
-def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_phi={}):
+def unidim_MEHP_compensator(tList, theta, phi=lambda mark : 1, arg_f={}, arg_phi={}):
     
     
     """
@@ -63,11 +63,12 @@ def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_
     # Compensator between beginning and first event time
     
     compensator = mu*(last_time - tList[0][0])
+
     transformed_times += [compensator]
     
     
     # Intensity 
-    ic = mu + a*phi( tList[0][1], **arg_phi, **arg_f)
+    ic = mu + a*phi( tList[1][1], **arg_phi, **arg_f)
     
     
 
@@ -84,6 +85,7 @@ def unidim_MEHP_compensator(tList, theta, phi=lambda mark, t : 1, arg_f={}, arg_
         
         
         compensator = (t_star < time)*(mu*(time-t_star) + b_1*(ic-mu)*(aux - np.exp(-b*(time-last_time))))
+        
         transformed_times += [transformed_times[-1]+compensator]
 
         
@@ -204,6 +206,8 @@ def multi_EHP_compensator(tList, theta,**kwargs):
     compensator = mu*(tb - tList[0][0])
     transformed_times += [np.sum(compensator)]
     individual_transformed_times[mb-1] += [compensator[mb - 1, 0]]
+
+
     # Intensity before first jump
     ic = mu + a[:, [mb - 1]]
     # j=1
@@ -230,7 +234,7 @@ def multi_EHP_compensator(tList, theta,**kwargs):
 
         tb = tc
     #print("transformed_times", individual_transformed_times[1][0:10])
-    return transformed_times, individual_transformed_times
+    return individual_transformed_times + [transformed_times]
 
 
 def multi_MEHP_compensator(tList,theta, phi={}, arg_phi={}, arg_f={}):
@@ -289,4 +293,4 @@ def multi_MEHP_compensator(tList,theta, phi={}, arg_phi={}, arg_f={}):
 
         time_b = time_c
     #print("transformed_times", individual_transformed_times[1][0:10])
-    return transformed_times, individual_transformed_times
+    return  individual_transformed_times + [transformed_times]

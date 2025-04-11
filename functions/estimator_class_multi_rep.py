@@ -4,7 +4,7 @@ from functions.GOF import *
 from functions.compensator import *
 import multiprocessing
 import functools
-from functions.display_qqconf import *
+from functions.qqconf.display_qqconf import *
 import matplotlib.pyplot as plt
 
 
@@ -175,6 +175,7 @@ class estimator_unidim_multi_rep(object):
 
     def GOF_bootstrap(self,
                     compensator_func = unidim_EHP_compensator, 
+                    alpha = 0.05,
                       sup_compensator=None,
                       SubSample_size= None, 
                       Nb_SubSample = 50,
@@ -237,15 +238,12 @@ class estimator_unidim_multi_rep(object):
         ## compare the pval distribution to a uniform one
         KS_test = kstest(pval_list, cdf = 'uniform')
         
-         ## display qqconf plot of the pvalue
-        if plot : 
-            with r_inline_plot():
-                uniformity_test( robjects.FloatVector(pval_list))
+        output_qqconf = qq_conf_test(pval_list, "uniform", alpha=alpha, plot = plot)
 
-        return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
+        return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue, "qqconf_val":output_qqconf})
 
         
-    def test_one_coeff(self, coefficient_index: int, value : float, plot = None):
+    def test_one_coeff(self, coefficient_index: int, value : float, plot = None, alpha = 0.05):
 
 
         """
@@ -275,13 +273,12 @@ class estimator_unidim_multi_rep(object):
 
         ks_test = kstest( test_stat, cdf='norm')
         
-        if plot : 
-            with r_inline_plot():
-                normality_test( robjects.FloatVector(test_stat))
+        output_qqconf = qq_conf_test(test_stat, "normal", alpha=alpha, plot = plot)
 
-        return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
 
-    def test_equality_coeff(self, coefficient_index_1, coefficient_index_2):
+        return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue, "qqconf_output":output_qqconf })
+
+    def test_equality_coeff(self, coefficient_index_1, coefficient_index_2, alpha =0.05, plot = False):
 
 
         """
@@ -304,11 +301,11 @@ class estimator_unidim_multi_rep(object):
         ks_test = kstest( stat, cdf='norm')
         
         
-        with r_inline_plot():
-            normality_test( robjects.FloatVector(stat))
+        output_qqconf = qq_conf_test(stat, "normal", alpha=alpha, plot = plot)
+
        
 
-        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
+        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue , "qqconf_output":output_qqconf })
 
         
 
@@ -482,7 +479,8 @@ class estimator_multidim_multi_rep(object):
         """
         
         self.time_jump = timestamps
-
+        self.max_jump = max_jump
+        self.max_time = max_time
         if not (max_time or max_jump):
                     print('Must specify if the last time corresponds to the last jump or the maximum observation time')
                 
@@ -515,8 +513,7 @@ class estimator_multidim_multi_rep(object):
         self.res_list = results
             
         self.params_estim = np.array([res.x for res in self.res_list])
-        self.mean_MLE = np.array(self.params_estim).mean(axis=0)
-        self.mean_theta = self.mean_MLE[-3:]
+        self.mean_MLE = self.params_estim.mean(axis=0)
         
         if self.mark:
             self.mean_f_arg = dict( zip( self.name_arg_f, self.mean_MLE[:len(self.name_arg_f)]))
@@ -533,12 +530,16 @@ class estimator_multidim_multi_rep(object):
         return(self.mean_MLE)
     
 
-    def GOF_bootstrap(self, 
-                      sup_compensator,
+    def GOF_bootstrap(self,
+                    compensator_func = multi_EHP_compensator, 
+                        alpha = 0.05,
+                      sup_compensator=None,
                       SubSample_size= None, 
-                      Nb_SubSample = 500,
+                      Nb_SubSample = 50,
                       nb_cores = -1, 
-                      compensator_func = unidim_EHP_compensator):
+                      test_type = 'uniform',
+                      plot = True,
+                      index_process = -1):
         
 
         """
@@ -577,20 +578,28 @@ class estimator_multidim_multi_rep(object):
             SubSample_size = int(sample_size**(2/3))
 
 
-        subsample = [np.random.choice([k for k in range(sample_size)], size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
+        pool = multiprocessing.pool.ThreadPool(nb_cores)     
+        time_transformed = pool.map(functools.partial(compensator_func,theta=self.mean_MLE, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg), self.timestamps_completed)
+        pool.close()
 
-        results = []
-
-        for index in subsample:
-            results+=[GOF_procedure(index,theta=self.mean_theta, tList=self.time_jump, markList=self.mark_list, compensator_func=compensator_func, sup_compensator=sup_compensator, phi=self.phi, arg_f=self.mean_f_arg, arg_phi=self.mean_phi_arg)]
+        ### select a subsample 
+        subsample = [np.random.choice(np.arange(sample_size), size=SubSample_size, replace=False) for l in range(Nb_SubSample)]
+        subsample_times = [[time_transformed[k][index_process] for k in index] for index in subsample]
+        
+        ## foor each subsample, perform gof procedure by aggegating transformed process and compute
+        ## the associated pval
+        pool = multiprocessing.pool.ThreadPool(nb_cores)     
+        pval_list = pool.map(functools.partial(GOF_procedure,sup_compensator=sup_compensator, test_type = test_type), subsample_times)
+        pool.close()
      
 
-        KS_test = kstest(results, cdf = 'uniform')
+        KS_test = kstest(pval_list, cdf = 'uniform')
         
-        with r_inline_plot():
-            uniformity_test( robjects.FloatVector(results))
+        output_qqconf = qq_conf_test(pval_list, "uniform", alpha=alpha, plot = plot)
+
+    
         
-        return( {"pvalList": results, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue})
+        return( {"pvalList": pval_list, "KStest_stat": KS_test.statistic, "KStest_pval" : KS_test.pvalue,'output_qqconf':output_qqconf })
 
         
     def test_one_coeff(self, index_coeff, theta_star):
@@ -611,9 +620,6 @@ class estimator_multidim_multi_rep(object):
         
         """
 
-        if (self.mark or (index_coeff == 1 and theta_star<=0)):
-            print("No theoretical garantee associated to this test")
-
 
         coeff = self.params_estim[:,index_coeff]
         
@@ -625,7 +631,7 @@ class estimator_multidim_multi_rep(object):
 
         return( {"estimatorList": test_stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
     
-    def test_equality_coeff(self, index_1, index_2):
+    def test_equality_coeff(self, index_1, index_2, alpha = 0.05, plot = False):
 
 
         """
@@ -651,11 +657,11 @@ class estimator_multidim_multi_rep(object):
         ks_test = kstest( stat, cdf='norm')
         
         
-        with r_inline_plot():
-            normality_test( robjects.FloatVector(stat))
+        output_qqconf = qq_conf_test(stat, "normal", alpha=alpha, plot = plot)
+
        
 
-        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue })
+        return( {"estimatorList": stat,  "KStest_stat": ks_test.statistic, "KStest_pval" : ks_test.pvalue, 'output_qqconf':output_qqconf })
 
 
 

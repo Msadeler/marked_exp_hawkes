@@ -745,4 +745,3 @@ class exp_thinning_hawkes_multi_marked(object):
     
   
     
-
