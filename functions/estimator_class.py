@@ -469,7 +469,7 @@ class estimator_bootstrap(object):
 
     def boostrap_procedure(self, 
                            tlist,
-                           rec_formula ,
+                           rec_formula=rec_compensator_unidim_MEHP ,
                             B = 100, 
                             nb_cores = None,  
                             max_jump = False, 
@@ -537,10 +537,7 @@ class estimator_bootstrap(object):
             if not nb_cores: 
                 nb_cores = multiprocessing.cpu_count()-1 
 
-            if not self.mark:
-                args = ()
-            else : 
-                args = (self.timelist,self.phi, self.f, self.name_arg_f, self.name_arg_phi,unidim_MEHP_compensator)
+            args = (self.timelist,self.phi, self.f, self.name_arg_f, self.name_arg_phi,unidim_MEHP_compensator)
 
             pool = multiprocessing.Pool(nb_cores)                         
             results = pool.map(functools.partial(minimization_function,
@@ -561,7 +558,7 @@ class estimator_bootstrap(object):
     def test_one_coeff(self, coefficient_index: int, value : float, alpha = 0.05):
 
         if len(self.param_estim)>0:
-            stat = np.abs( self.thetahat[coefficient_index])/np.std(  self.param_estim[:,coefficient_index], ddof=-1)
+            stat = np.abs( self.thetahat[coefficient_index]-value)/np.std(  self.param_estim[:,coefficient_index], ddof=-1)
             return( {'stat': stat, 'quantile':scipy.stats.norm.ppf(1-alpha/2)})
         
 
