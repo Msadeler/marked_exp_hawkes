@@ -1,0 +1,9 @@
+{
+  "alpha": -0.2,
+  "beta": 1,
+  "lambda0": 1,
+  "gamma": 1,
+  'psi':2
+  "Tmax": 5000,
+  "NbSample": 500
+}

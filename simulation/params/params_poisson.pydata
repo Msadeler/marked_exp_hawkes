@@ -1,0 +1,8 @@
+{
+  "alpha": 0,
+  "beta": 2,
+  "lambda0": 1,
+  "gamma": 0,
+  "Tmax": 5000,
+  "NbSample": 500
+}

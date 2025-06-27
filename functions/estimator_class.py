@@ -559,7 +559,7 @@ class estimator_bootstrap(object):
 
         if len(self.param_estim)>0:
             stat = np.abs( self.thetahat[coefficient_index]-value)/np.std(  self.param_estim[:,coefficient_index], ddof=-1)
-            return( {'stat': stat, 'quantile':scipy.stats.norm.ppf(1-alpha/2)})
+            return( {'stat': stat, 'quantile':scipy.stats.norm.ppf(1-alpha/2) })
         
 
 class multivariate_estimator(object):
