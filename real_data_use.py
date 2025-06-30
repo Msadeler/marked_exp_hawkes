@@ -1,5 +1,9 @@
 #%%
 
+#############################################################################
+######################## Exemple of use on real data ########################
+#############################################################################
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -7,9 +11,10 @@ import numpy as np
 import functions as hp
 from functions.paramtrised_function import *
 
+np.random.seed(0)
 
 data_earthquake = pd.read_csv('data/ogata/ogata.csv', index_col=0).loc[:, ['time', 'magnitude']]
-data_tuple = [(0,0)] +list(data_earthquake.itertuples(index=False, name = None)) +  [(800,0)]  ### put data here
+data_tuple = [(0,0)] +list(data_earthquake.itertuples(index=False, name = None)) +  [(800,0)]  ### put data 
 
 def rec_formula(t, m,a,b,arg_f,arg_phi, phi, timebefore, intensity_last_jump, time_transformed):
     return( time_transformed+ m*(t-timebefore[0])+ (1-np.exp(-b*(t-timebefore[0])))*(intensity_last_jump+a*phi(timebefore[1], **arg_phi, **arg_f)-m)/b )

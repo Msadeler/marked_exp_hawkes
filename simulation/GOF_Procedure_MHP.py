@@ -23,12 +23,12 @@ with open(file_path, "r") as f:
 output = []
 outputHawkes=[]
 
-m,a,b = params['lambda0'],params['alpha'], params['beta']
-gamma= params['gamma']
-psi = params['psi']
+m,a,b = params['lambda0'],params['alpha'], params['beta'] # m = 1 , a= 0.6 , b=2 
+gamma= params['gamma'] ## gamma = 2
+psi = params['psi'] ## psi = 1
 
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
+Tmax = params['Tmax'] ## Tmax = 5000
+Nbsample= params['NbSample'] ## Nbsample = 500
 
 
 #%%

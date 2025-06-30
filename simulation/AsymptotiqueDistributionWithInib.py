@@ -18,12 +18,12 @@ with open(file_path, "r") as f:
 
 
 #%%
-alpha = params['beta']
-beta = params['alpha']
-lambda0 = params['lambda0']
-gamma= params['gamma']
-Tmax = params['Tmax']
-NbSample= params['NbSample'] 
+alpha = params['beta'] # b = 1
+beta = params['alpha'] # a = -0.2
+lambda0 = params['lambda0'] # m =1
+gamma= params['gamma'] # gamma =2
+Tmax = params['Tmax'] ## Tmax = 20 000 
+NbSample= params['NbSample'] ## nbsample =  500
 
 AlphaList = []
 Hessian = []

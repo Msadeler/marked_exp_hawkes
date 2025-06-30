@@ -32,11 +32,11 @@ with open(file_path, "r") as f:
 
 
 
-alpha = params['alpha']
-beta = params['beta']
-lambda0 = params['lambda0']
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
+alpha = params['alpha'] # a = 0  or 0.6 
+beta = params['beta'] # beta = 2
+lambda0 = params['lambda0'] # m = 1
+Tmax = params['Tmax'] # Tmax = 5000
+Nbsample= params['NbSample'] # Nbsample = 5000
 
 param_estim_D, param_estim= [],[]
 fisher_info_D, fisher_info= [],[]

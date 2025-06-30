@@ -13,9 +13,9 @@ with open(file_path, "r") as f:
 output = []
 outputHawkes=[]
 
-m,b = params['lambda0'], params['beta']
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
+m,b = params['lambda0'], params['beta']  ## m = 0.6 , b = 2
+Tmax = params['Tmax'] ## tmax = 5000
+Nbsample= params['NbSample'] ## Nbsample = 500
 
 for a in  [0.05,0.1,0.4]:
 

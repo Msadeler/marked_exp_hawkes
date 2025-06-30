@@ -5,5 +5,5 @@
   "gamma": 1,
   "psi":2,
   "Tmax": 5000,
-  "NbSample": 500
+  "NbSample": 150
 }

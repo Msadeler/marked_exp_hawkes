@@ -6,6 +6,10 @@ from functions.multivariate_exponential_process import *
 from functions.estimator_class_multi_rep import *
 import json
 
+#####################################################################################################
+######################## Exemple of scritp for the simulation and estimation ########################
+#####################################################################################################
+
 np.random.seed(0)
 
 
@@ -16,9 +20,9 @@ with open(file_path, "r") as f:
     params = json.load(f)
 
 
-m,a,b = params['lambda0'],params['alpha'], params['beta']
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
+m,a,b = params['lambda0'],params['alpha'], params['beta'] ## m = , a = -0.2, b = 1
+Tmax = params['Tmax'] ## Tmax = 5000
+Nbsample= params['NbSample'] ## Nbsample = 500
 
 
 

@@ -17,14 +17,12 @@ with open(file_path, "r") as f:
 output = []
 outputHawkes=[]
 
-m,a,b = params['lambda0'],params['alpha'], params['beta']
-gamma= params['gamma']
-psi = params['psi']
+m,a,b = params['lambda0'],params['alpha'], params['beta'] ## m = 1, a  0.6, b = 2
+gamma= params['gamma'] # gamma = 2
+psi = params['psi'] # psi = 1
+n_rep= params['NbSample'] ## nbsample = 150
 
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
 tmax =[50, 100, 200, 500, 1000]
-n_rep = 15*10
 
 
 

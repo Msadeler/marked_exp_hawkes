@@ -15,11 +15,11 @@ with open(file_path, "r") as f:
     params = json.load(f)
 
 
-alpha = params['alpha']
-beta = params['beta']
-lambda0 = params['lambda0']
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
+alpha = params['alpha'] ## a = -0.2 
+beta = params['beta'] ## b= 1
+lambda0 = params['lambda0'] ## m = 1
+Tmax = params['Tmax'] ## Tmax = 5000
+Nbsample= params['NbSample'] ## Nbsample = 500
 
 
 SubSample = int(Nbsample**(2/3) )

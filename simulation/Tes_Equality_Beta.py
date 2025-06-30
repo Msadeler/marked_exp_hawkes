@@ -19,12 +19,12 @@ with open('params/params_MultidimLEHP.pydata', "r") as f:
 
 risk_type = 2
 
-alpha = params['alpha']
-beta = beta = np.array(params["beta"][str(risk_type)])
-lambda0 = params['lambda0']
-Tmax = params['Tmax']
-Nbsample= params['NbSample']
-dim = params['dim']
+alpha = params['alpha'] ## a = [[0.4, 0.2],[0.2, 0.3]]
+beta = beta = np.array(params["beta"][str(risk_type)]) ## b = [[1],[1]] or [[1],[1.5]]
+lambda0 = params['lambda0'] # m = [[1], [1]]
+Tmax = params['Tmax'] # Tmax = 5000
+Nbsample= params['NbSample'] # nbsample = 5000
+dim = params['dim'] ## dim = 2
 
 NbTrial = 0
 
